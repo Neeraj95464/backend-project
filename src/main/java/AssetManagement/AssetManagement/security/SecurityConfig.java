@@ -42,9 +42,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers("/api/info").hasAnyRole("USER", "ADMIN", "EXECUTIVE")  // ✅ Only "USER", "ADMIN", "EXECUTIVE" roles can access
                         .requestMatchers("/api/assets/delete/**").hasRole("ADMIN")  // ✅ Only "ADMIN" can delete assets
-                        .requestMatchers("/api/assets/**").hasAnyRole("ADMIN", "EXECUTIVE")  // ✅ "ADMIN" & "EXECUTIVE" can create assets
-                        .requestMatchers("/api/users/**").hasRole("ADMIN")  // ✅ Only "ADMIN" can manage users
+                        .requestMatchers("/api/assets/**").hasAnyRole("ADMIN","EXECUTIVE")  // ✅ "ADMIN" & "EXECUTIVE" can create assets
+                        .requestMatchers("/api/users/**").hasRole("ADMIN") // ✅ Only "ADMIN" can manage users
+                        .requestMatchers("/api/user-assets/**").hasAnyRole("USER","ADMIN")
                         .requestMatchers("/api/asset-photos/uploads/**").permitAll()
+                        .requestMatchers("/api/asset-documents/uploads/**").permitAll()
                         .anyRequest().authenticated()  // ✅ Any other request must be authenticated
                 )
                 .exceptionHandling(exception -> exception

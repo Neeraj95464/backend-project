@@ -6,6 +6,7 @@ import AssetManagement.AssetManagement.entity.AssetHistory;
 import AssetManagement.AssetManagement.enums.AssetStatus;
 import AssetManagement.AssetManagement.exception.AssetNotFoundException;
 import AssetManagement.AssetManagement.repository.AssetHistoryRepository;
+import AssetManagement.AssetManagement.repository.AssetRepository;
 import AssetManagement.AssetManagement.service.AssetService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -26,10 +27,12 @@ public class AssetController {
 
     private final AssetService assetService;
     private final AssetHistoryRepository assetHistoryRepository;
+    private final AssetRepository assetRepository;
 
-    public AssetController(AssetService assetService, AssetHistoryRepository assetHistoryRepository) {
+    public AssetController(AssetService assetService, AssetHistoryRepository assetHistoryRepository, AssetRepository assetRepository) {
         this.assetService = assetService;
         this.assetHistoryRepository = assetHistoryRepository;
+        this.assetRepository = assetRepository;
     }
 
     @GetMapping
@@ -50,22 +53,15 @@ public class AssetController {
     public List<AssetDTO> getAssetsByStatus(@PathVariable AssetStatus status) {
         return assetService.getAssetsByStatus(status);
     }
-    @GetMapping("/{idOrSerial}")
-    public ResponseEntity<AssetDTO> getAssetByIdOrSerial(@PathVariable String idOrSerial) {
+
+    @GetMapping("/{assetTagOrSerial}")
+    public ResponseEntity<AssetDTO> getAssetByAssetTagOrSerial(@PathVariable String assetTagOrSerial) {
         try {
-            Optional<AssetDTO> asset;
-
-            // Check if the input is numeric (Assuming Asset ID is numeric)
-            if (idOrSerial.matches("\\d+")) {
-                asset = assetService.getAssetById(idOrSerial);
-            } else {
-                asset = assetService.getAssetBySerialNumber(idOrSerial);
-            }
-
+            Optional<AssetDTO> asset = assetService.getAssetByAssetTagOrSerial(assetTagOrSerial);
             return asset.map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
-
+                    .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
         } catch (Exception e) {
+            e.printStackTrace(); // Log for debugging
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -87,7 +83,26 @@ public class AssetController {
         }
     }
 
-    @PutMapping("/{id}")
+    @PostMapping("/{parentId}/add-child")
+    public ResponseEntity<Asset> addChildAsset(@PathVariable Long parentId, @RequestBody Asset childAsset) {
+        Asset parent = assetRepository.findById(parentId)
+                .orElseThrow(() -> new RuntimeException("Parent Asset not found"));
+
+        childAsset.setParentAsset(parent);
+        Asset savedChild = assetRepository.save(childAsset);
+
+        return ResponseEntity.ok(savedChild);
+    }
+
+    @GetMapping("/{id}/children")
+    public List<Asset> getChildAssets(@PathVariable Long id) {
+        Asset parent = assetRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Asset not found"));
+
+        return parent.getChildAssets();
+    }
+
+    @PutMapping("/{assetTag}")
     public ResponseEntity<AssetDTO> updateAsset(@PathVariable String assetTag, @RequestBody Asset asset) {
         try {
 //            System.out.println("Request reveived with "+id +" asset is "+asset);
@@ -203,15 +218,15 @@ public class AssetController {
                     .body(Map.of("error", "An unexpected error occurred: " + e.getMessage()));
         }
     }
-    @GetMapping("/asset-tag")
-    public ResponseEntity<AssetDTO> getAssetByAssetTag(@RequestParam String assetTag) {
-        AssetDTO assetDTO = assetService.getAssetByAssetTag(assetTag);
-        if (assetDTO != null) {
-            return ResponseEntity.ok(assetDTO);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
-    }
+//    @GetMapping("/asset-tag")
+//    public ResponseEntity<AssetDTO> getAssetByAssetTag(@RequestParam String assetTag) {
+//        AssetDTO assetDTO = assetService.getAssetByAssetTag(assetTag);
+//        if (assetDTO != null) {
+//            return ResponseEntity.ok(assetDTO);
+//        } else {
+//            return ResponseEntity.notFound().build();
+//        }
+//    }
 
     @PostMapping("/{assetTag}/checkin")
     public ResponseEntity<AssetDTO> checkInAsset(

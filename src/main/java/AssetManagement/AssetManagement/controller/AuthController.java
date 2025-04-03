@@ -8,8 +8,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -17,7 +15,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
-//@CrossOrigin(origins = "*") // Allows requests from frontend
 public class AuthController {
 
     @Autowired
@@ -31,32 +28,25 @@ public class AuthController {
 
     @PostMapping("/login")
     public Map<String, Object> login(@RequestBody AuthRequest authRequest) {
-        System.out.println("your request was "+authRequest);
+        System.out.println("Login request: " + authRequest);
 
-        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-        String hashedPassword = "$2a$10$8OOHxeZ3x/p5t3pAaD1cy./vjzpHxSTeHxPw7EjUiPF8lVUeUWaza";
-        String rawPassword = authRequest.getPassword().toLowerCase();
-
-        boolean isMatch = passwordEncoder.matches(rawPassword, hashedPassword);
-        System.out.println("Password Match: " + isMatch); // Should print: true
-
+        // Authenticate user by empId and password
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(authRequest.getUsername(), authRequest.getPassword())
+                new UsernamePasswordAuthenticationToken(authRequest.getEmployeeId(), authRequest.getPassword())
         );
 
-        // If authentication is successful, generate JWT token
-        String token = jwtTokenProvider.generateToken(authentication);
+        // Generate JWT Token with empId
+        String token = jwtTokenProvider.generateToken(authentication, authRequest.getEmployeeId());
 
-        // Get user details
-        UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.getUsername());
+        // Get user details using empId
+        UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.getEmployeeId());
 
         // Response with token and user info
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
-        response.put("username", userDetails.getUsername());
+        response.put("empId", authRequest.getEmployeeId());
         response.put("roles", userDetails.getAuthorities());
 
         return response;
     }
 }
-

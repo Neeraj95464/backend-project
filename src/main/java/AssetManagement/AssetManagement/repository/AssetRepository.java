@@ -16,6 +16,6 @@ public interface AssetRepository extends JpaRepository<Asset, Long> {
     Optional<Asset> findBySerialNumber(String serialNumber);
     List<Asset> findByStatus(AssetStatus status);
     Optional<Asset> findByAssetTag(String assetTag);
-
+    
 }
 

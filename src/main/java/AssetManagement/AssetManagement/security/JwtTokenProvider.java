@@ -1,10 +1,14 @@
 package AssetManagement.AssetManagement.security;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
 import java.util.Date;
 
 @Component
@@ -16,47 +20,51 @@ public class JwtTokenProvider {
     @Value("${app.jwtExpirationMs}")
     private int jwtExpirationMs;
 
-    // ✅ Generate Token with Role
-    public String generateToken(Authentication authentication) {
-        String username = authentication.getName();
+    private Key getSigningKey() {
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
 
-        // Extract role from authentication object (assuming only one role)
+    // ✅ Generate Token using `empId`
+    public String generateToken(Authentication authentication, String empId) {
         String role = authentication.getAuthorities().iterator().next().getAuthority();
 
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
         return Jwts.builder()
-                .setSubject(username)
-                .claim("role", role)  // ✅ Adding role as a claim
+                .setSubject(empId)  // ✅ Fixed: Use setSubject() instead of subject()
+                .claim("role", role)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
-                .signWith(SignatureAlgorithm.HS512, jwtSecret)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
                 .compact();
     }
 
-    // ✅ Extract Username from Token
-    public String getUsernameFromJWT(String token) {
-        Claims claims = Jwts.parser()
-                .setSigningKey(jwtSecret)
+
+    // ✅ Extract Employee ID from Token
+    public String getEmployeeIdFromJWT(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
                 .parseClaimsJws(token)
                 .getBody();
-        return claims.getSubject();
+        return claims.getSubject();  // ✅ Extracting empId
     }
 
     // ✅ Extract Role from Token
     public String getRoleFromJWT(String token) {
-        Claims claims = Jwts.parser()
-                .setSigningKey(jwtSecret)
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
                 .parseClaimsJws(token)
                 .getBody();
-        return claims.get("role", String.class);  // ✅ Extract the role
+        return claims.get("role", String.class);
     }
 
-    // ✅ Validate JWT Token
+    // ✅ Validate Token
     public boolean validateToken(String authToken) {
         try {
-            Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(authToken);
+            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(authToken);
             return true;
         } catch (JwtException | IllegalArgumentException ex) {
             System.out.println("⚠️ Invalid JWT Token: " + ex.getMessage());

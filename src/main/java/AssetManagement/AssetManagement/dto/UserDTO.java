@@ -18,6 +18,7 @@ public class UserDTO {
     private Long id; // User ID (for updates and identification)
 
     private String username; // Username
+    private String employeeId;
 
     private String password; // Password (ensure it's hashed during storage)
 

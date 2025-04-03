@@ -42,7 +42,7 @@ public class AssetService {
         this.assetHistoryService = assetHistoryService;
     }
     public AssetDTO dispose(String assetTag, String statusNote) {
-        String modifiedBy=AuthUtils.getAuthenticatedUsername();
+        String modifiedBy=AuthUtils.getAuthenticatedUserExactName();
         Optional<Asset> optionalAsset = assetRepository.findByAssetTag(assetTag);
 
         if (optionalAsset.isEmpty()) {
@@ -79,7 +79,7 @@ public class AssetService {
     }
 
     public AssetDTO markAsLost(String assetTag, String statusNote) {
-        String modifiedBy=AuthUtils.getAuthenticatedUsername();
+        String modifiedBy=AuthUtils.getAuthenticatedUserExactName();
         Optional<Asset> optionalAsset = assetRepository.findByAssetTag(assetTag);
 
         if (optionalAsset.isEmpty()) {
@@ -113,7 +113,7 @@ public class AssetService {
 
     @Transactional
     public AssetDTO reserveAsset(String assetTag, AssetReservationRequest request) {
-        String modifiedBy=AuthUtils.getAuthenticatedUsername();
+        String modifiedBy=AuthUtils.getAuthenticatedUserExactName();
         Asset asset = assetRepository.findByAssetTag(assetTag)
                 .orElseThrow(() -> new AssetNotFoundException("Asset not found with ID: " + assetTag));
 
@@ -212,13 +212,30 @@ public class AssetService {
     }
 
     // Save a new asset
-    public AssetDTO saveAsset(Asset asset) {
-        String assetCreator = AuthUtils.getAuthenticatedUsername();
-        asset.setCreatedBy(assetCreator);
-        asset.setCreatedAt(LocalDateTime.now());
-        Asset savedAsset = assetRepository.save(asset);
-        return convertAssetToDto(savedAsset);
-    }
+        @Transactional
+        public AssetDTO saveAsset(Asset asset) {
+            // Validate uniqueness before saving
+            validateUniqueFields(asset);
+
+            asset.setCreatedBy(AuthUtils.getAuthenticatedUserExactName());
+            asset.setCreatedAt(LocalDateTime.now());
+
+            Asset savedAsset = assetRepository.save(asset);
+
+            return convertAssetToDto(savedAsset);
+        }
+
+        private void validateUniqueFields(Asset asset) {
+            Optional<Asset> existingBySerial = assetRepository.findBySerialNumber(asset.getSerialNumber());
+            if (existingBySerial.isPresent() && !existingBySerial.get().getId().equals(asset.getId())) {
+                throw new IllegalArgumentException("Serial Number must be unique. Duplicate found!");
+            }
+
+            Optional<Asset> existingByTag = assetRepository.findByAssetTag(asset.getAssetTag());
+            if (existingByTag.isPresent() && !existingByTag.get().getId().equals(asset.getId())) {
+                throw new IllegalArgumentException("Asset Tag must be unique. Duplicate found!");
+            }
+        }
 
     // Retrieve an asset by ID
     public Optional<AssetDTO> getAssetById(String assetTag) {
@@ -226,7 +243,7 @@ public class AssetService {
     }
 
     public void deleteAsset(String assetTag) {
-        String modifiedBy=AuthUtils.getAuthenticatedUsername();
+        String modifiedBy=AuthUtils.getAuthenticatedUserExactName();
         Asset asset = assetRepository.findByAssetTag(assetTag)
                 .orElseThrow(() -> new AssetNotFoundException("Asset not found with ID: " + assetTag));
 
@@ -253,7 +270,7 @@ public class AssetService {
     @Transactional
     public AssetDTO updateAssetStatus(String assetTag, AssetStatus newStatus, Long userId, LocalDate reservationStartDate,
                                       LocalDate reservationEndDate, String statusNote) {
-        String modifiedBy=AuthUtils.getAuthenticatedUsername();
+        String modifiedBy=AuthUtils.getAuthenticatedUserExactName();
         Asset asset = findAssetById(assetTag);
 
         validateAssetStatus(newStatus, userId, reservationStartDate, reservationEndDate, statusNote,asset);
@@ -279,7 +296,7 @@ public class AssetService {
 
     @Transactional
     public AssetDTO editAsset(String assetTag, Asset updatedAsset) {
-        String modifiedBy=AuthUtils.getAuthenticatedUsername();
+        String modifiedBy=AuthUtils.getAuthenticatedUserExactName();
         if (assetTag == null || updatedAsset == null || modifiedBy == null || modifiedBy.trim().isEmpty()) {
             throw new IllegalArgumentException("Invalid input parameters: Asset ID, updated asset, and modifiedBy must not be null or empty.");
         }
@@ -391,7 +408,7 @@ public class AssetService {
     public AssetDTO assignAssetToUser(String assetTag, CheckOutDTO checkOutDTO) {
         // 🔍 Fetch asset from DB
         Asset asset = findAssetById(assetTag);
-        String modifiedBy = AuthUtils.getAuthenticatedUsername();
+        String modifiedBy = AuthUtils.getAuthenticatedUserExactName();
 
         // 🚨 Validate if asset is already assigned
         if (asset.getAssignedUser() != null) {
@@ -464,7 +481,7 @@ public class AssetService {
 
     @Transactional
     public AssetDTO checkInAsset(String assetTag, CheckInDTO checkInDTO) {
-        String modifiedBy = AuthUtils.getAuthenticatedUsername();
+        String modifiedBy = AuthUtils.getAuthenticatedUserExactName();
         // 🔍 Fetch asset from DB
         Asset asset = findAssetById(assetTag);
 
@@ -544,6 +561,13 @@ public class AssetService {
         );
     }
 
+    public Optional<AssetDTO> getAssetByAssetTagOrSerial(String assetTagOrSerial) {
+        return assetRepository.findByAssetTag(assetTagOrSerial)
+                .map(this::convertAssetToDto)
+                .or(() -> assetRepository.findBySerialNumber(assetTagOrSerial).map(this::convertAssetToDto)
+                        );
+    }
+
     public List<AssetDTO> getAssetsByStatus(AssetStatus status) {
         List<Asset> assets = assetRepository.findByStatus(status);
 
@@ -551,7 +575,6 @@ public class AssetService {
                 .map(this::convertAssetToDto)  // Using your existing conversion method
                 .collect(Collectors.toList());
     }
-
 
     // Retrieve assets by location
     public List<AssetDTO> getAssetsByLocation(Long locationId) {
@@ -609,7 +632,7 @@ public class AssetService {
 
 
     public void resetAssetStatus(String assetTag, String statusNote) {
-        String modifiedBy = AuthUtils.getAuthenticatedUsername();
+        String modifiedBy = AuthUtils.getAuthenticatedUserExactName();
         Asset asset = assetRepository.findByAssetTag(assetTag).orElseThrow(()->new AssetNotFoundException("Asset not found "));
         if (asset == null) {
             throw new IllegalArgumentException("Asset cannot be null");
@@ -651,7 +674,7 @@ public class AssetService {
     }
 
     public AssetDTO updateAssetToInRepair(String assetTag, Long userId, String statusNote, boolean markAsRepaired) {
-        String modifiedBy = AuthUtils.getAuthenticatedUsername();
+        String modifiedBy = AuthUtils.getAuthenticatedUserExactName();
         // Fetch asset or throw exception if not found
         Asset asset = assetRepository.findByAssetTag(assetTag)
                 .orElseThrow(() -> new AssetNotFoundException("Asset with ID " + assetTag + " not found"));
@@ -704,7 +727,7 @@ public class AssetService {
         return convertAssetToDto(asset);
     }
 
-    private AssetDTO convertAssetToDto(Asset asset) {
+    public AssetDTO convertAssetToDto(Asset asset) {
         AssetDTO dto = new AssetDTO();
         dto.setAssetTag(asset.getAssetTag());
         dto.setName(asset.getName());

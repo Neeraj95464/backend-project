@@ -20,8 +20,8 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        if (user.getRole() == null) {
-            return Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")); // Default role
+        if (user.getRole() == null || user.getRole().isEmpty()) {
+            throw new IllegalStateException("User role cannot be null or empty"); // 🚀 Ensure role is assigned
         }
         return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().toUpperCase()));
     }
@@ -33,7 +33,7 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public String getUsername() {
-        return user.getUsername();
+        return user.getEmployeeId();  // ✅ Use empId instead of username
     }
 
     @Override

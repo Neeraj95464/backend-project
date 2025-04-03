@@ -16,6 +16,10 @@ public class LocationService {
         this.locationRepository = locationRepository;
     }
 
+    public List<Location> findByName(String name) {
+        return locationRepository.findByNameContainingIgnoreCase(name);
+    }
+
     // Retrieve locations by site ID
     public List<Location> getLocationsBySiteId(Long siteId) {
         return locationRepository.findBySiteId(siteId);

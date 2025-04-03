@@ -36,7 +36,7 @@ public class Asset {
 
     private String description;
 
-    @Nonnull
+    @Column(unique = true, nullable = false)
     private String serialNumber;
 
     private LocalDate purchaseDate;
@@ -82,6 +82,14 @@ public class Asset {
 
     @OneToMany(mappedBy = "asset", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AssetPhoto> photos = new ArrayList<>();
+
+    // Self-referencing relationship for Parent-Child Assets
+    @OneToMany(mappedBy = "parentAsset", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Asset> childAssets = new ArrayList<>();
+
+    @ManyToOne
+    @JoinColumn(name = "parent_asset_id")
+    private Asset parentAsset;
 
     @PrePersist
     public void generateAssetTag() {
