@@ -5,6 +5,7 @@ import AssetManagement.AssetManagement.entity.AssetPhoto;
 import AssetManagement.AssetManagement.repository.AssetPhotoRepository;
 import AssetManagement.AssetManagement.repository.AssetRepository;
 
+import AssetManagement.AssetManagement.util.AuthUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -20,6 +21,7 @@ import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.Files;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -59,12 +61,13 @@ public class AssetPhotoController {
                     AssetPhoto photo = new AssetPhoto();
                     photo.setPhotoUrl(fileName);
                     photo.setAsset(asset);
+                    photo.setAddedAt(LocalDateTime.now());
+                    photo.setAddedBy(AuthUtils.getAuthenticatedUsername());
                     assetPhotoRepository.save(photo);
 
                     uploadedFiles.append(fileName).append("\n");
                 }
             }
-
             return ResponseEntity.ok("Photos uploaded successfully:\n" + uploadedFiles);
         } catch (IOException e) {
             return ResponseEntity.status(500).body("Failed to save files: " + e.getMessage());

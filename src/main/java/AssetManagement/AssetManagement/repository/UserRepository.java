@@ -11,19 +11,21 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
-
+    Optional<User> findByEmployeeId(String empId);
+    Optional<User> findByEmail(String email);
 
     @Query("SELECT u FROM User u WHERE " +
-            "(:id IS NULL OR u.id = :id) AND " +
-            "(:username IS NULL OR u.username LIKE %:username%) AND " +
-            "(:phoneNumber IS NULL OR u.phoneNumber LIKE %:phoneNumber%) AND " +
-            "(:email IS NULL OR u.email LIKE %:email%)")
+            "(:employeeId IS NULL OR u.employeeId = :employeeId) AND " +
+            "(:username IS NULL OR LOWER(u.username) LIKE LOWER(CONCAT('%', :username, '%'))) AND " +
+            "(:phoneNumber IS NULL OR u.phoneNumber = :phoneNumber) AND " +
+            "(:email IS NULL OR LOWER(u.email) = LOWER(:email))")
     Page<User> findUsers(
-            @Param("id") Long id,
+            @Param("employeeId") String employeeId,
             @Param("username") String username,
             @Param("phoneNumber") String phoneNumber,
             @Param("email") String email,
-            Pageable pageable);
+            Pageable pageable
+    );
 
 }
 

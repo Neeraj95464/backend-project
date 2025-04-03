@@ -16,6 +16,14 @@ public class LocationController {
     @Autowired
     private LocationService locationService;
 
+
+    @GetMapping("/search")
+    public ResponseEntity<List<Location>> searchLocations(
+            @RequestParam(value = "name") String name) {
+        List<Location> locations = locationService.findByName(name);
+        return ResponseEntity.ok(locations);
+    }
+
     @GetMapping("/site/{siteId}")
     public ResponseEntity<List<Location>> getLocationsBySite(@PathVariable Long siteId) {
         List<Location> locations = locationService.getLocationsBySiteId(siteId);

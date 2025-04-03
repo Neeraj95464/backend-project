@@ -35,14 +35,14 @@ public class UserController {
     }
     @GetMapping("/search")
     public ResponseEntity<PaginatedResponse<UserDTO>> searchUser(
-            @RequestParam(required = false) Long id,
+            @RequestParam(required = false) String employeeId,
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String phoneNumber,
             @RequestParam(required = false) String email,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        PaginatedResponse<UserDTO> users = userService.searchUser(id, username, phoneNumber, email, page, size);
+        PaginatedResponse<UserDTO> users = userService.searchUser(employeeId, username, phoneNumber, email, page, size);
 
         return ResponseEntity.ok(users);
     }

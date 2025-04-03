@@ -4,6 +4,7 @@ import AssetManagement.AssetManagement.dto.PaginatedResponse;
 import AssetManagement.AssetManagement.dto.UserDTO;
 import AssetManagement.AssetManagement.entity.User;
 import AssetManagement.AssetManagement.repository.UserRepository;
+import AssetManagement.AssetManagement.util.AuthUtils;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
@@ -42,10 +43,10 @@ public class UserService {
         );
     }
 
-    public PaginatedResponse<UserDTO> searchUser(Long id, String username, String phoneNumber, String email, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id").ascending());
+    public PaginatedResponse<UserDTO> searchUser(String employeeId, String username, String phoneNumber, String email, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("employeeId").ascending());
 
-        Page<User> users = userRepository.findUsers(id, username, phoneNumber, email, pageable);
+        Page<User> users = userRepository.findUsers(employeeId, username, phoneNumber, email, pageable);
 
         List<UserDTO> userDTOList = users.getContent().stream()
                 .map(this::convertUserToDto)
@@ -70,11 +71,22 @@ public class UserService {
     // Create a new user
     @Transactional
     public UserDTO createUser(User user) {
+        // Fetch the authenticated user's details
+        Optional<User> authenticatedUser = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername());
+
+        // Set the createdBy field with the name of the authenticated user
+        user.setCreatedBy(authenticatedUser.map(User::getUsername).orElse("Unknown"));
+
+        // Encode and set the password
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-        String hashedPassword = passwordEncoder.encode("aa"); // Hash "aa" before saving
-        user.setPassword(hashedPassword); // Store the hashed password
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+
+        // Assign default role
         user.setRole("USER");
+
+        // Save the user
         User savedUser = userRepository.save(user);
+
         return convertUserToDto(savedUser);
     }
 
@@ -109,34 +121,14 @@ public class UserService {
         return false;
     }
 
-    // Retrieve users by site ID
-//    public List<UserDTO> getUsersBySite(Long siteId) {
-//        return userRepository.findBySiteId(siteId).stream()
-//                .map(this::convertUserToDto)
-//                .collect(Collectors.toList());
-//    }
-
-    // Retrieve users by department
-//    public List<UserDTO> getUsersByDepartment(String department) {
-//        return userRepository.findByDepartment(department).stream()
-//                .map(this::convertUserToDto)
-//                .collect(Collectors.toList());
-//    }
-//
-//    // Search users by username
-//    public List<UserDTO> searchUsersByUsername(String username) {
-//        return userRepository.findByUsernameContainingIgnoreCase(username).stream()
-//                .map(this::convertUserToDto)
-//                .collect(Collectors.toList());
-//    }
-
     // Convert User entity to UserDTO
 
-    private UserDTO convertUserToDto(User user) {
+    public UserDTO convertUserToDto(User user) {
         UserDTO dto = new UserDTO();
         dto.setId(user.getId());
         dto.setUsername(user.getUsername());
         dto.setRole(user.getRole());
+        dto.setEmployeeId(user.getEmployeeId());
         dto.setEmail(user.getEmail());
         dto.setPhoneNumber(user.getPhoneNumber());
         dto.setDepartment(user.getDepartment());
