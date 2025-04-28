@@ -30,6 +30,7 @@ public class Ticket {
         @Enumerated(EnumType.STRING)
         private TicketStatus status; // Open, In Progress, Resolved, Closed
 
+        private String messageId;
         @ManyToOne
         @JoinColumn(name = "employee")
         private User employee; // User who created the ticket

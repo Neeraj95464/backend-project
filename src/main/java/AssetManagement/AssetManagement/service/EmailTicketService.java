@@ -6,10 +6,13 @@ import AssetManagement.AssetManagement.entity.Ticket;
 import AssetManagement.AssetManagement.entity.TicketMessage;
 import AssetManagement.AssetManagement.entity.User;
 import AssetManagement.AssetManagement.enums.TicketStatus;
+import AssetManagement.AssetManagement.exception.UserNotFoundException;
 import AssetManagement.AssetManagement.mapper.TicketMapper;
 import AssetManagement.AssetManagement.repository.TicketMessageRepository;
 import AssetManagement.AssetManagement.repository.TicketRepository;
 import AssetManagement.AssetManagement.repository.UserRepository;
+import AssetManagement.AssetManagement.util.AuthUtils;
+import jakarta.annotation.Nullable;
 import jakarta.mail.*;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeBodyPart;
@@ -86,7 +89,16 @@ public class EmailTicketService {
                     } else {
                         // ✅ If not a reply, create a new ticket
                         TicketDTO ticketDTO = createTicketFromEmail(subject, content, senderEmail);
-                        sendAcknowledgmentEmail(mimeMessage, ticketDTO, ccEmails); // Send reply as acknowledgment
+//                        sendAcknowledgmentEmail(mimeMessage, ticketDTO, ccEmails); // Send reply as acknowledgment
+
+                        sendTicketAcknowledgmentEmail(
+                                senderEmail,
+                                ticketRepository.findById(ticketDTO.getId()).orElseThrow(),
+                                ccEmails,
+                                mimeMessage.getHeader("Message-ID", null),
+                                mimeMessage.getSubject()
+                        );
+
                     }
 
                     message.setFlag(Flags.Flag.SEEN, true); // Mark as read
@@ -100,13 +112,48 @@ public class EmailTicketService {
         }
     }
 
+//    @Transactional
+//    public TicketDTO createTicketFromEmail(String emailSubject, String emailBody, String senderEmail) {
+//        Ticket ticket = new Ticket();
+//        ticket.setTitle(emailSubject); // Email subject as ticket title
+//        ticket.setDescription(emailBody); // Email body as ticket description
+//        ticket.setCategory(TicketCategory.OTHER); // Default category (update as needed)
+//        ticket.setStatus(TicketStatus.OPEN);
+//        System.out.println("your email is "+senderEmail);
+//        ticket.setEmployee(userRepository.findByEmail(senderEmail)
+//                .orElseThrow(() -> new UserNotFoundException("User not found")));
+//        System.out.println("your user is "+userRepository.findByEmail(senderEmail)
+//                .orElseThrow(() -> new UserNotFoundException("User not found")));
+//        ticket.setCreatedAt(LocalDateTime.now());
+//        ticket.setUpdatedAt(LocalDateTime.now());
+//
+//        System.out.println("your ticket is "+ticket);
+//        Ticket savedTicket = ticketRepository.save(ticket);
+//        return ticketMapper.toDTO(savedTicket);
+//    }
+
     @Transactional
     public TicketDTO createTicketFromEmail(String emailSubject, String emailBody, String senderEmail) {
         Ticket ticket = new Ticket();
-        ticket.setTitle(emailSubject); // Email subject as ticket title
-        ticket.setDescription(emailBody); // Email body as ticket description
-        ticket.setCategory(TicketCategory.OTHER); // Default category (update as needed)
-        ticket.setStatus(TicketStatus.OPEN);
+        ticket.setTitle(emailSubject);
+        ticket.setDescription(emailBody);
+        ticket.setCategory(TicketCategory.OTHER);
+//        ticket.setStatus(TicketStatus.OPEN);
+
+        System.out.println("Sender email: " + senderEmail);
+
+        User sender = userRepository.findByEmail(senderEmail)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        System.out.println("User found - Email: " + sender.getEmail());
+
+        ticket.setEmployee(sender);
+
+        if (ticket.getAssignee() == null) {
+            ticket.setStatus(TicketStatus.UNASSIGNED);
+        } else {
+            ticket.setStatus(TicketStatus.OPEN);
+        }
 
         ticket.setCreatedAt(LocalDateTime.now());
         ticket.setUpdatedAt(LocalDateTime.now());
@@ -114,35 +161,6 @@ public class EmailTicketService {
         Ticket savedTicket = ticketRepository.save(ticket);
         return ticketMapper.toDTO(savedTicket);
     }
-
-    public void sendTicketCreationEmail(String userEmail, Ticket ticket) {
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
-
-            helper.setTo(userEmail);
-            helper.setSubject("Ticket ID: " + ticket.getId() + " - " + ticket.getTitle());
-
-            String emailBody = "<html><body>"
-                    + "<p>Hello,</p>"
-                    + "<p>Your ticket has been successfully created.</p>"
-                    + "<p><b>Ticket ID:</b> " + ticket.getId() + "</p>"
-                    + "<p><b>Title:</b> " + ticket.getTitle() + "</p>"
-                    + "<p><b>Status:</b> " + ticket.getStatus() + "</p>"
-                    + "<p><b>Created At:</b> " + ticket.getCreatedAt() + "</p>"
-                    + "<p>We will get back to you shortly.</p>"
-                    + "<p>Best Regards,<br>IT Support Team</p>"
-                    + "</body></html>";
-
-            helper.setText(emailBody, true); // ✅ Enables HTML content
-
-            mailSender.send(message);
-            System.out.println("✅ Ticket creation email sent to: " + userEmail);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
 
 
     private List<String> extractRecipients(Message message) throws MessagingException {
@@ -232,50 +250,46 @@ public class EmailTicketService {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new EntityNotFoundException("Ticket not found"));
 
-        // ✅ Fetch the latest ticket message (last email in the thread)
-        TicketMessage lastMessage = ticketMessageRepository.findTopByTicketOrderBySentAtDesc(ticket);
-
-        if (lastMessage == null) {
-            System.out.println("⚠ No previous messages found for ticket: " + ticketId);
-            return;
-        }
-
-        String recipient = ticket.getEmployee().getEmail(); // Send reply to ticket creator
+        TicketMessage firstMessage = ticketMessageRepository.findTopByTicketOrderBySentAtAsc(ticket);
+        String recipient = ticket.getEmployee().getEmail();
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
             helper.setTo(recipient);
+//            helper.setSubject("Ticket ID: " + ticket.getId() + " - " + ticket.getTitle());
             helper.setSubject(ticket.getTitle());
             helper.setText("New update on your ticket:\n\n" + messageContent, false);
 
-            // ✅ Ensure the reply is in the same thread
-            if (lastMessage.getMessageId() != null) {
-                message.setHeader("In-Reply-To", lastMessage.getMessageId());
-                message.setHeader("References", lastMessage.getMessageId());
+            // ✅ Maintain email thread with proper headers
+            if (firstMessage != null && firstMessage.getMessageId() != null) {
+                message.setHeader("In-Reply-To", firstMessage.getMessageId());
+                message.setHeader("References", firstMessage.getMessageId());
             }
 
-            message.saveChanges(); // ✅ Ensures Message-ID is generated
+            message.saveChanges(); // Ensures Message-ID is generated
 
+            // ✅ Send message
             mailSender.send(message);
-            System.out.println("✅ Reply sent for Ticket ID: " + ticketId);
 
-            // ✅ Save the sent message in the database
+            // ✅ Save this reply with the new Message-ID for future threading
+            String messageId = message.getMessageID(); // Extract after saveChanges()
+
             TicketMessage replyMessage = new TicketMessage();
             replyMessage.setTicket(ticket);
-            replyMessage.setSender(ticket.getEmployee()); // Assign sender
+            replyMessage.setSender(ticket.getEmployee()); // Or logged-in user
             replyMessage.setMessage(messageContent);
             replyMessage.setSentAt(LocalDateTime.now());
-            replyMessage.setMessageId(message.getMessageID()); // ✅ Now this will be non-null
+            replyMessage.setMessageId(messageId); // ✅ Save new message ID
 
             ticketMessageRepository.save(replyMessage);
 
+            System.out.println("✅ Reply sent for Ticket ID: " + ticketId + " with Message-ID: " + messageId);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
 
 
 
@@ -305,43 +319,147 @@ public class EmailTicketService {
     }
 
 
-    // ✅ Sends an acknowledgment email as a REPLY to the original ticket email
-    private void sendAcknowledgmentEmail(Message originalEmail, TicketDTO ticket,List<String> ccEmails) {
+    public void sendAcknowledgmentReplyToTicket(Long ticketId, String messageContent, String inReplyToMessageId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new EntityNotFoundException("Ticket not found"));
+
+        // Get the currently logged-in user
+        User sender = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(() -> new UserNotFoundException("Authenticated user not found"));
+
         try {
-            MimeMessage replyMessage = (MimeMessage) mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(replyMessage, true);
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
-            String senderEmail = ((InternetAddress) originalEmail.getFrom()[0]).getAddress();
-            String messageId = originalEmail.getHeader("Message-ID")[0]; // Get original message ID
+            String recipientEmail;
+            String ccEmail = null;
 
-            // ✅ Modify subject to include Ticket ID
-            String newSubject = "Ticket ID: " + ticket.getId() + " - " + originalEmail.getSubject();
-
-
-            helper.setTo(senderEmail);
-            helper.setSubject(newSubject); // Updated subject
-
-            if (!ccEmails.isEmpty()) {
-                helper.setCc(ccEmails.toArray(new String[0]));
+            // Determine who should be in "To" and who should be in "Cc"
+            if (sender.getId().equals(ticket.getEmployee().getId())) {
+                // Sender is the employee
+                if (ticket.getAssignee() != null) {
+                    recipientEmail = ticket.getAssignee().getEmail(); // Send to assignee
+                    ccEmail = sender.getEmail(); // CC the employee
+                } else {
+                    recipientEmail = "manager@example.com"; // Default recipient
+                }
+            } else if (ticket.getAssignee() != null && sender.getId().equals(ticket.getAssignee().getId())) {
+                // Sender is the assignee
+                recipientEmail = ticket.getEmployee().getEmail(); // Send to employee
+                ccEmail = sender.getEmail(); // CC the assignee
+            } else {
+                // Sender is neither the employee nor assignee — fallback to manager
+                recipientEmail = "kumarneerajkumar1781@gmail.com";
             }
-            helper.setText(
-                    "Hello,\n\n" +
-                            "Your ticket has been created successfully.\n\n" +
-                            "**Ticket ID:** " + ticket.getId() + "\n" +
-                            "**Title:** " + ticket.getTitle() + "\n" +
-                            "**Status:** " + ticket.getStatus() + "\n\n" +
-                            "We will get back to you shortly.\n\n" +
-                            "Best Regards,\nIT Support Team"
-            );
 
-            // ✅ Ensure email threads correctly
-            replyMessage.setHeader("In-Reply-To", messageId);
-            replyMessage.setHeader("References", messageId);
+            helper.setTo(recipientEmail);
 
-            mailSender.send(replyMessage);
-            System.out.println("✅ Acknowledgment reply sent to: " + senderEmail + " (CC: " + ccEmails + ")");
+            if (ccEmail != null) {
+                helper.setCc(ccEmail);
+            }
+
+            helper.setSubject("Re: Ticket ID: " + ticket.getId() + " - " + ticket.getTitle());
+            helper.setText("Your message has been received:\n\n" + messageContent, false);
+
+            // Email threading headers
+            if (inReplyToMessageId != null) {
+                message.setHeader("In-Reply-To", inReplyToMessageId);
+                message.setHeader("References", inReplyToMessageId);
+            }
+
+            message.saveChanges(); // Required for Message-ID
+            String messageId = message.getMessageID();
+
+            mailSender.send(message);
+
+            // Save message to DB
+//            TicketMessage replyMessage = new TicketMessage();
+//            replyMessage.setTicket(ticket);
+//            replyMessage.setSender(sender);
+//            replyMessage.setMessage(messageContent);
+//            replyMessage.setSentAt(LocalDateTime.now());
+//            replyMessage.setMessageId(messageId);
+
+//            ticketMessageRepository.save(replyMessage);
+
+            System.out.printf("✅ Acknowledgment reply sent to %s%s%n",
+                    recipientEmail, ccEmail != null ? " (cc: " + ccEmail + ")" : "");
+
         } catch (Exception e) {
+            System.err.println("❌ Failed to send acknowledgment reply for ticket ID: " + ticketId);
             e.printStackTrace();
         }
     }
+
+    public void sendTicketAcknowledgmentEmail(
+            String recipientEmail,
+            Ticket ticket,
+            @Nullable List<String> ccEmails,
+            @Nullable String inReplyToMessageId,
+            @Nullable String originalSubject
+    ) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            // Subject - add ticket ID and fallback to title
+            String subject = "Ticket ID: " + ticket.getId() + " - " +
+                    (originalSubject != null ? originalSubject : ticket.getTitle());
+
+            helper.setTo(recipientEmail);
+            helper.setSubject(subject);
+
+            // Optional CCs
+            if (ccEmails != null && !ccEmails.isEmpty()) {
+                helper.setCc(ccEmails.toArray(new String[0]));
+            }
+
+            // HTML email content
+            String htmlContent = """
+                <html>
+                    <body style="font-family: Arial, sans-serif;">
+                        <p>Dear User,</p>
+                        <p>Your support ticket has been created successfully with the following details:</p>
+                        <table style="border-collapse: collapse; width: 100%%;">
+                            <tr><td><strong>Ticket ID:</strong></td><td>%d</td></tr>
+                            <tr><td><strong>Title:</strong></td><td>%s</td></tr>
+                            <tr><td><strong>Status:</strong></td><td>%s</td></tr>
+                            <tr><td><strong>Created At:</strong></td><td>%s</td></tr>
+                        </table>
+                        <p>We will get back to you shortly.</p>
+                        <br>
+                        <p>Best Regards,<br><strong>IT Support Team</strong></p>
+                    </body>
+                </html>
+                """.formatted(
+                    ticket.getId(),
+                    ticket.getTitle(),
+                    ticket.getStatus().name(),
+                    ticket.getCreatedAt().toString()
+            );
+
+            helper.setText(htmlContent, true); // HTML enabled
+
+            // Threading headers for reply
+            if (inReplyToMessageId != null) {
+                message.setHeader("In-Reply-To", inReplyToMessageId);
+                message.setHeader("References", inReplyToMessageId);
+            }
+
+// Generate and store new Message-ID
+            message.saveChanges(); // Required for getMessageID()
+            String newMessageId = message.getMessageID();
+            ticket.setMessageId(newMessageId); // Save for future threading
+            ticketRepository.save(ticket);
+
+            mailSender.send(message);
+            System.out.println("✅ Acknowledgment email sent to " + recipientEmail);
+            System.out.println("your message id "+ticket.getMessageId());
+
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send acknowledgment email to " + recipientEmail);
+            e.printStackTrace();
+        }
+    }
+
 }

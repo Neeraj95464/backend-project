@@ -23,7 +23,8 @@ public class TicketMapper {
                 ticket.getAssignee() != null ? ticket.getAssignee().getUsername() : null, // Convert User → String
                 ticket.getAsset() != null ? ticket.getAsset().getAssetTag() : null, // Convert Asset → String
                 ticket.getAsset() != null ? ticket.getAsset().getName() : null, // Convert Asset → String
-                ticket.getLocation() != null ? ticket.getLocation().getId() : null, // Convert Location → ID
+                ticket.getLocation() != null ? ticket.getLocation().getName() : null,
+                ticket.getLocation() != null ? ticket.getLocation().getId() : null,// Convert Location → ID
                 ticket.getCcEmails(),
                 ticket.getCreatedAt(),
                 ticket.getUpdatedAt(),

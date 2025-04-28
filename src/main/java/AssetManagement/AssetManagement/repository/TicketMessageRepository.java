@@ -12,6 +12,8 @@ public interface TicketMessageRepository extends JpaRepository<TicketMessage, Lo
     List<TicketMessage> findByTicket(Ticket ticket);
 
     TicketMessage findTopByTicketOrderBySentAtDesc(Ticket ticket);
+
+    TicketMessage findTopByTicketOrderBySentAtAsc(Ticket ticket);
 //    List<TicketMessage> findByTicket(Ticket ticket);
 
 }

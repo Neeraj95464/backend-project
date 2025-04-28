@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -65,6 +66,12 @@ public class AssetController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+    @GetMapping("/by-category")
+    public ResponseEntity<List<Map<String, Object>>> getAssetsByCategory() {
+        return ResponseEntity.ok(assetService.getAssetCountByType());
+    }
+
 
     @GetMapping("/search")
     public List<Asset> searchAssets(@RequestParam("query") String query) {
@@ -218,15 +225,6 @@ public class AssetController {
                     .body(Map.of("error", "An unexpected error occurred: " + e.getMessage()));
         }
     }
-//    @GetMapping("/asset-tag")
-//    public ResponseEntity<AssetDTO> getAssetByAssetTag(@RequestParam String assetTag) {
-//        AssetDTO assetDTO = assetService.getAssetByAssetTag(assetTag);
-//        if (assetDTO != null) {
-//            return ResponseEntity.ok(assetDTO);
-//        } else {
-//            return ResponseEntity.notFound().build();
-//        }
-//    }
 
     @PostMapping("/{assetTag}/checkin")
     public ResponseEntity<AssetDTO> checkInAsset(
@@ -295,4 +293,12 @@ public class AssetController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred while checking out the asset.");
         }
     }
+
+
+
+    @GetMapping("/assets/cost-by-category")
+    public ResponseEntity<Map<String, BigDecimal>> getCostByAssetType() {
+        return ResponseEntity.ok(assetService.getCostByAssetType());
+    }
+
 }

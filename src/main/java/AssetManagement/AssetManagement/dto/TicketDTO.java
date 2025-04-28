@@ -22,6 +22,7 @@ public class TicketDTO {
     private String assignee; // Username of the assigned person
     private String assetTag; // ✅ Asset ID for tracking
     private String assetName; // ✅ Asset Name for display
+    private String locationName;
     private Long location;
     private List<String> ccEmails;
     private LocalDateTime createdAt;
