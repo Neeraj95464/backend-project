@@ -87,6 +87,9 @@ public class Asset {
     @OneToMany(mappedBy = "parentAsset", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Asset> childAssets = new ArrayList<>();
 
+    @OneToMany(mappedBy = "parentAsset", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ChildAsset> smallChildAssets = new ArrayList<>();
+
     @ManyToOne
     @JoinColumn(name = "parent_asset_id")
     private Asset parentAsset;

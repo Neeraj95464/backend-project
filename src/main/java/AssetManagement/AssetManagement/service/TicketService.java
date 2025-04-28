@@ -1,9 +1,6 @@
 package AssetManagement.AssetManagement.service;
 
-import AssetManagement.AssetManagement.dto.PaginatedResponse;
-import AssetManagement.AssetManagement.dto.TicketCategory;
-import AssetManagement.AssetManagement.dto.TicketDTO;
-import AssetManagement.AssetManagement.dto.TicketMessageDTO;
+import AssetManagement.AssetManagement.dto.*;
 import AssetManagement.AssetManagement.entity.*;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import AssetManagement.AssetManagement.exception.UserNotFoundException;
@@ -55,7 +52,6 @@ public class TicketService {
         ticket.setTitle(ticketDTO.getTitle());
         ticket.setDescription(ticketDTO.getDescription());
         ticket.setCategory(ticketDTO.getCategory());
-        ticket.setStatus(TicketStatus.OPEN);
         ticket.setCreatedBy(AuthUtils.getAuthenticatedUserExactName());
 
         // ✅ Fetch and set location
@@ -63,46 +59,108 @@ public class TicketService {
                 .orElseThrow(() -> new EntityNotFoundException("Location not found"));
         ticket.setLocation(location);
 
-        // ✅ Fetch and set Employee
+        // ✅ Fetch and set employee
         User employeeUser = userRepository.findByEmployeeId(ticketDTO.getEmployee())
                 .orElseThrow(() -> new EntityNotFoundException("Employee not found"));
         ticket.setEmployee(employeeUser);
 
-        // ✅ Set Asset if provided
-        assetRepository.findByAssetTag(ticketDTO.getAssetTag()).ifPresent(ticket::setAsset);
+        // ✅ Set asset if provided
+        assetRepository.findByAssetTag(ticketDTO.getAssetTag())
+                .ifPresent(ticket::setAsset);
+
+
+
+        // ✅ Auto-assign IT executive based on location
+        User assignee = findITExecutiveByLocation(location.getId());
+        ticket.setAssignee(assignee);
+
+        // ✅ Set status based on whether an assignee is available
+        if (assignee == null) {
+            ticket.setStatus(TicketStatus.UNASSIGNED);
+        } else {
+            ticket.setStatus(TicketStatus.OPEN);
+        }
 
         ticket.setCreatedAt(LocalDateTime.now());
         ticket.setUpdatedAt(LocalDateTime.now());
 
-        // ✅ Auto-assign IT executive based on location
-        User assignee = findITExecutiveByLocation(location.getId()); // Auto-assign
-        ticket.setAssignee(assignee); // Even if null, it's fine
-
         Ticket savedTicket = ticketRepository.save(ticket);
-        // ✅ Send email notification to the ticket creator
-        emailTicketService.sendTicketCreationEmail(employeeUser.getEmail(), ticket);
+
+        // ✅ Send acknowledgment email to the ticket creator
+        emailTicketService.sendTicketAcknowledgmentEmail(
+                employeeUser.getEmail(),
+                ticket,
+                null,
+                null,
+                null
+        );
+
         return convertTicketToDTO(savedTicket);
     }
 
 
+    public TicketDTO getTicketById(Long id) {
+        Ticket ticket = ticketRepository.findById(id)
+                .orElse(null);
+        if (ticket == null) {
+            return null;
+        }
+        return ticketMapper.toDTO(ticket); // Assumes you're using a mapper to convert entity to DTO
+    }
 
-    public List<TicketDTO> searchTickets(Long ticketId, String title, String category, TicketStatus status, String employee, String assignee, String assetTag, Long location) {
+    @Transactional
+    public Ticket updateTicket(Long ticketId, TicketUpdateRequest request) {
+        Optional<Ticket> optionalTicket = ticketRepository.findById(ticketId);
+        if (optionalTicket.isEmpty()) {
+            throw new RuntimeException("Ticket not found with ID: " + ticketId);
+        }
 
-        if (ticketId != null) { // If ticket ID is provided, return only that ticket
-            Optional<Ticket> ticketOptional = ticketRepository.findById(ticketId);
-            return ticketOptional.map(ticket -> List.of(convertTicketToDTO(ticket))).orElse(List.of());
+        Ticket ticket = optionalTicket.get();
+
+        if (request.getStatus() != null) {
+            ticket.setStatus(request.getStatus());
+        }
+
+        if (request.getCcEmails() != null) {
+            ticket.setCcEmails(request.getCcEmails());
+        }
+
+        if (request.getLocationId() != null) {
+            Location location = locationRepository.findById(request.getLocationId())
+                    .orElseThrow(() -> new RuntimeException("Location not found"));
+            ticket.setLocation(location);
+        }
+
+        return ticketRepository.save(ticket);
+    }
+
+
+    public List<TicketDTO> searchTickets(Long ticketId, String title, String category,
+                                         TicketStatus status, String employee, String assignee,
+                                         String assetTag, Long locationId) {
+
+        if (ticketId != null) {
+            return ticketRepository.findById(ticketId)
+                    .map(ticket -> List.of(convertTicketToDTO(ticket)))
+                    .orElse(List.of());
         }
 
         List<Ticket> tickets = ticketRepository.findAll();
 
         return tickets.stream()
-                .filter(ticket -> (title == null || ticket.getTitle().toLowerCase().contains(title.toLowerCase())))
-                .filter(ticket -> (category == null || ticket.getCategory().toString().equalsIgnoreCase(category)))
-                .filter(ticket -> (status == null || ticket.getStatus() == status))
-                .filter(ticket -> (employee == null || ticket.getEmployee().getUsername().equalsIgnoreCase(employee)))
-                .filter(ticket -> (assignee == null || (ticket.getAssignee() != null && ticket.getAssignee().getUsername().equalsIgnoreCase(assignee))))
-                .filter(ticket -> (assetTag == null || (ticket.getAsset() != null && ticket.getAsset().getAssetTag().equalsIgnoreCase(assetTag))))
-                .filter(ticket -> (location == null || ticket.getLocation().equals(location)))
+                .filter(ticket -> title == null ||
+                        (ticket.getTitle() != null && ticket.getTitle().toLowerCase().contains(title.toLowerCase())))
+                .filter(ticket -> category == null ||
+                        (ticket.getCategory() != null && ticket.getCategory().name().equalsIgnoreCase(category)))
+                .filter(ticket -> status == null || ticket.getStatus() == status)
+                .filter(ticket -> employee == null ||
+                        (ticket.getEmployee() != null && ticket.getEmployee().getUsername().equalsIgnoreCase(employee)))
+                .filter(ticket -> assignee == null ||
+                        (ticket.getAssignee() != null && ticket.getAssignee().getUsername().equalsIgnoreCase(assignee)))
+                .filter(ticket -> assetTag == null ||
+                        (ticket.getAsset() != null && ticket.getAsset().getAssetTag().equalsIgnoreCase(assetTag)))
+                .filter(ticket -> locationId == null ||
+                        (ticket.getLocation() != null && ticket.getLocation().getId().equals(locationId)))
                 .map(this::convertTicketToDTO)
                 .collect(Collectors.toList());
     }
@@ -166,6 +224,11 @@ public class TicketService {
         ticket.setAssignee(assignee);
         ticket.setUpdatedAt(LocalDateTime.now());
 
+        if (assignee == null) {
+            ticket.setStatus(TicketStatus.UNASSIGNED);
+        } else{
+            ticket.setStatus(TicketStatus.OPEN);
+        }
         Ticket updatedTicket = ticketRepository.save(ticket);
         return convertTicketToDTO(updatedTicket);
     }
@@ -185,19 +248,11 @@ public class TicketService {
         ticketMessage.setSentAt(LocalDateTime.now());
 
         TicketMessage savedMessage = ticketMessageRepository.save(ticketMessage);
-        emailTicketService.sendReplyToTicket(ticketId,ticketMessage.getMessage());
+        emailTicketService.sendAcknowledgmentReplyToTicket(ticketId,message,ticket.getMessageId());
+
         return convertMessageToDTO(savedMessage);
     }
 
-//    public TicketDTO updateTicketStatus(Long ticketId, TicketStatus status) {
-//        Ticket ticket = ticketRepository.findById(ticketId)
-//                .orElseThrow(() -> new IllegalArgumentException("Ticket not found"));
-//
-//        ticket.setStatus(status);
-//        ticketRepository.save(ticket);
-//
-//        return ticketMapper.toDTO(ticket);
-//    }
 
     public TicketDTO updateTicketStatus(Long ticketId, TicketStatus newStatus) {
         String updatedByEmployeeId = AuthUtils.getAuthenticatedUsername();
@@ -228,21 +283,6 @@ public class TicketService {
         return convertTicketToDTO(ticket);
     }
 
-
-
-//    public List<TicketDTO> getUserTickets(String employeeId) {
-//        User user = userRepository.findByEmployeeId(employeeId)
-//                .orElseThrow(() -> new UserNotFoundException("User not found"));
-//
-//        List<Ticket> tickets = ticketRepository.findByEmployee(user);
-//
-//        if (tickets == null || tickets.isEmpty()) {
-//            return Collections.emptyList();
-//        }
-//
-//        return tickets.stream().map(this::convertTicketToDTO).collect(Collectors.toList());
-//    }
-
     public List<TicketDTO> getUserTickets(String employeeId, TicketStatus status) {
         User user = userRepository.findByEmployeeId(employeeId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
@@ -260,9 +300,34 @@ public class TicketService {
         return tickets.stream().distinct().map(this::convertTicketToDTO).collect(Collectors.toList());
     }
 
+//    public List<TicketDTO> getUserTickets(String employeeId, TicketStatus status) {
+//        User user = userRepository.findByEmployeeId(employeeId)
+//                .orElseThrow(() -> new UserNotFoundException("User not found"));
+//
+//        List<Ticket> tickets;
+//
+//        if (status != null) {
+//            tickets = ticketRepository.findByEmployeeAndStatus(user, status);
+//            tickets.addAll(ticketRepository.findByAssigneeAndStatus(user, status));
+//        } else {
+//            tickets = ticketRepository.findByEmployee(user);
+//            tickets.addAll(ticketRepository.findByAssignee(user));
+//        }
+//
+//        return tickets.stream()
+//                .distinct()
+//                .peek(ticket -> {
+//                    // ✅ Mark as UNASSIGNED if there's no assignee
+//                    if (ticket.getAssignee() == null) {
+//                        ticket.setStatus(TicketStatus.UNASSIGNED);
+//                    }
+//                })
+//                .map(this::convertTicketToDTO)
+//                .collect(Collectors.toList());
+//    }
 
 
-        public List<TicketDTO> getUserTicketsByStatus(String employeeId, TicketStatus status) {
+    public List<TicketDTO> getUserTicketsByStatus(String employeeId, TicketStatus status) {
             User user = userRepository.findByEmployeeId(employeeId)
                     .orElseThrow(() -> new UserNotFoundException("User not found"));
 
@@ -306,11 +371,12 @@ public class TicketService {
                 ticket.getCategory(),
 
                 ticket.getStatus(),
-                ticket.getEmployee() != null ? ticket.getEmployee().getEmployeeId() : null, // ✅ Employee ID instead of username
+                ticket.getEmployee() != null ? ticket.getEmployee().getUsername() : null, // ✅ Employee ID instead of username
                 ticket.getCreatedBy(),
                 ticket.getAssignee() != null ? ticket.getAssignee().getUsername() : null, // ✅ Assignee Username
                 ticket.getAsset() != null ? ticket.getAsset().getAssetTag() : null, // ✅ Asset ID
                 ticket.getAsset() != null ? ticket.getAsset().getName() : "Other", // ✅ Asset Name or "Other"
+                ticket.getLocation() != null ? ticket.getLocation().getName():null,
                 ticket.getLocation() != null ? ticket.getLocation().getId():null,
                 ticket.getCcEmails(),
                 ticket.getCreatedAt(),

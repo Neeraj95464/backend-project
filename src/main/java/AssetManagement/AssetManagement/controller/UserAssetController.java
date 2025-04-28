@@ -1,6 +1,7 @@
 package AssetManagement.AssetManagement.controller;
 
 import AssetManagement.AssetManagement.dto.*;
+import AssetManagement.AssetManagement.entity.Ticket;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import AssetManagement.AssetManagement.service.TicketService;
 import AssetManagement.AssetManagement.service.UserAssetService;
@@ -46,15 +47,6 @@ public class UserAssetController {
         return ResponseEntity.ok(userDTO);
     }
 
-//    @GetMapping("/admin/tickets")
-//    public ResponseEntity<PaginatedResponse<TicketDTO>> getAllTicketsForAdmin(
-//            @RequestParam(defaultValue = "0") int page,
-//            @RequestParam(defaultValue = "10") int size) {
-//
-//        PaginatedResponse<TicketDTO> tickets = ticketService.getAllTicketsForAdmin(page, size);
-//        return ResponseEntity.ok(tickets);
-//    }
-
     @GetMapping("/admin/tickets")
     public ResponseEntity<PaginatedResponse<TicketDTO>> getAllTicketsForAdmin(
             @RequestParam(defaultValue = "0") int page,
@@ -64,7 +56,6 @@ public class UserAssetController {
         PaginatedResponse<TicketDTO> response = ticketService.getAllTicketsForAdmin(page, size, status);
         return ResponseEntity.ok(response);
     }
-
 
     @GetMapping("/search")
     public List<TicketDTO> searchTickets(
@@ -92,6 +83,25 @@ public class UserAssetController {
         List<TicketDTO> tickets = ticketService.getUserTickets(employeeId, status);
         return ResponseEntity.ok(tickets);
     }
+
+    @PutMapping("/{id}/update")
+    public ResponseEntity<Ticket> updateTicket(
+            @PathVariable("id") Long ticketId,
+            @RequestBody TicketUpdateRequest request
+    ) {
+        Ticket updatedTicket = ticketService.updateTicket(ticketId, request);
+        return ResponseEntity.ok(updatedTicket);
+    }
+
+    @GetMapping("/tickets/{id}")
+    public ResponseEntity<TicketDTO> getTicketById(@PathVariable Long id) {
+        TicketDTO ticket = ticketService.getTicketById(id);
+        if (ticket == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(ticket);
+    }
+
 
     @PutMapping("/tickets/{ticketId}/status")
     public ResponseEntity<TicketDTO> updateTicketStatus(

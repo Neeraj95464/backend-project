@@ -727,6 +727,10 @@ public class AssetService {
         return convertAssetToDto(asset);
     }
 
+    public List<Map<String, Object>> getAssetCountByType() {
+        return assetRepository.countAssetsByType();
+    }
+
     public AssetDTO convertAssetToDto(Asset asset) {
         AssetDTO dto = new AssetDTO();
         dto.setAssetTag(asset.getAssetTag());
@@ -760,4 +764,23 @@ public class AssetService {
 
         return dto;
     }
+
+
+//    public Map<String, BigDecimal> getCostByAssetType() {
+//        return assetRepository.findAll().stream()
+//                .collect(Collectors.groupingBy(
+//                        asset -> asset.getAssetType().name(),
+//                        Collectors.reducing(BigDecimal.ZERO, Asset::getCost, BigDecimal::add)
+//                ));
+//    }
+public Map<String, BigDecimal> getCostByAssetType() {
+    return assetRepository.findAll().stream()
+            .filter(asset -> asset.getCost() != null && asset.getAssetType() != null)
+            .collect(Collectors.groupingBy(
+                    asset -> asset.getAssetType().name(),
+                    Collectors.reducing(BigDecimal.ZERO, Asset::getCost, BigDecimal::add)
+            ));
+}
+
+
 }
