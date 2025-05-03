@@ -27,5 +27,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
             Pageable pageable
     );
 
+    boolean existsByEmployeeId(String employeeId);
+
+    boolean existsByEmail(String email);
 }
 

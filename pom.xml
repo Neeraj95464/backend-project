@@ -157,6 +157,7 @@
 				<version>3.4.1</version>
 			</plugin>
 		</plugins>
+		<finalName>AssetManagement</finalName>
 	</build>
 
 </project>

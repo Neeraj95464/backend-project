@@ -14,14 +14,21 @@ public class WebConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173")); // Allow frontend origin
+        config.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "https://mahavir-asset.netlify.app",
+                "https://*.ngrok-free.app",
+                "https://innocent-centrally-dodo.ngrok-free.app",
+                "https://engage-commodities-except-harbour.trycloudflare.com"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-        config.setExposedHeaders(List.of("Authorization")); // ✅ Ensure frontend can read the Authorization token
-        config.setAllowCredentials(true); // ✅ Required for cookies/auth
+        config.setExposedHeaders(List.of("Authorization"));
+        config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return new CorsFilter(source);
     }
 }
+
