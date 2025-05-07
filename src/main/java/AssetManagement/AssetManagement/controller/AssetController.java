@@ -8,6 +8,7 @@ import AssetManagement.AssetManagement.exception.AssetNotFoundException;
 import AssetManagement.AssetManagement.repository.AssetHistoryRepository;
 import AssetManagement.AssetManagement.repository.AssetRepository;
 import AssetManagement.AssetManagement.service.AssetService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
+@Slf4j
 @RequestMapping("/api/assets")
 //@CrossOrigin(origins = "http://localhost:5173/")
 public class AssetController {
@@ -78,17 +80,50 @@ public class AssetController {
         return assetService.searchAssets(query);
     }
 
-    @PostMapping
-    public ResponseEntity<AssetDTO> createAsset(@RequestBody Asset asset) {
+//    @PostMapping
+//    public ResponseEntity<AssetDTO> createAsset(@RequestBody Asset asset) {
+//        System.out.println("asset creation request came with dat "+asset);
+//        try {
+//            AssetDTO savedAsset = assetService.saveAsset(asset);
+//            return ResponseEntity.status(HttpStatus.CREATED).body(savedAsset);
+//        } catch (IllegalArgumentException e) {
+//            return ResponseEntity.badRequest().body(null);
+//        } catch (Exception e) {
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+//        }
+//    }
+
+        @PostMapping
+        public ResponseEntity<AssetDTO> createAsset(@RequestBody Asset asset) {
+            log.debug("Received asset creation request with data: {}", asset);
+
+            try {
+                AssetDTO savedAsset = assetService.saveAsset(asset);
+                log.debug("Asset created successfully: {}", savedAsset);
+                return ResponseEntity.status(HttpStatus.CREATED).body(savedAsset);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid asset data provided: {}", e.getMessage());
+                return ResponseEntity.badRequest().body(null);
+            } catch (Exception e) {
+                log.error("Unexpected error during asset creation", e);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
+        }
+
+    @PostMapping("/bulk")
+    public ResponseEntity<List<AssetDTO>> createAssetsBulk(@RequestBody List<Asset> assets) {
+        log.debug("Received bulk asset creation request. Total assets: {}", assets.size());
+
         try {
-            AssetDTO savedAsset = assetService.saveAsset(asset);
-            return ResponseEntity.status(HttpStatus.CREATED).body(savedAsset);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(null);
+            List<AssetDTO> savedAssets = assetService.saveAssetsBulk(assets);
+            log.debug("Bulk asset creation successful. Saved: {}", savedAssets.size());
+            return ResponseEntity.status(HttpStatus.CREATED).body(savedAssets);
         } catch (Exception e) {
+            log.error("Bulk asset creation failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
+
 
     @PostMapping("/{parentId}/add-child")
     public ResponseEntity<Asset> addChildAsset(@PathVariable Long parentId, @RequestBody Asset childAsset) {

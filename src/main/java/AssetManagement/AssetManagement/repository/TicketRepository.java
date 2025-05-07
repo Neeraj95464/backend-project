@@ -1,6 +1,6 @@
 package AssetManagement.AssetManagement.repository;
 
-import AssetManagement.AssetManagement.dto.TicketCategory;
+import AssetManagement.AssetManagement.enums.TicketCategory;
 import AssetManagement.AssetManagement.entity.Location;
 import AssetManagement.AssetManagement.entity.Ticket;
 import AssetManagement.AssetManagement.entity.User;

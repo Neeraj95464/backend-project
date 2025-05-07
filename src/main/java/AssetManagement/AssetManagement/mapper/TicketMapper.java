@@ -25,6 +25,7 @@ public class TicketMapper {
                 ticket.getAsset() != null ? ticket.getAsset().getName() : null, // Convert Asset → String
                 ticket.getLocation() != null ? ticket.getLocation().getName() : null,
                 ticket.getLocation() != null ? ticket.getLocation().getId() : null,// Convert Location → ID
+                ticket.getTicketDepartment(),
                 ticket.getCcEmails(),
                 ticket.getCreatedAt(),
                 ticket.getUpdatedAt(),

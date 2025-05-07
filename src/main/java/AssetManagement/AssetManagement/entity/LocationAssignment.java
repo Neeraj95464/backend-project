@@ -1,5 +1,6 @@
 package AssetManagement.AssetManagement.entity;
 
+import AssetManagement.AssetManagement.enums.TicketDepartment;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -22,5 +23,9 @@ public class LocationAssignment {
     @ManyToOne
     @JoinColumn(name = "location_id", nullable = false)
     private Location location; // ✅ Assigned Location
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TicketDepartment ticketDepartment;
 }
 

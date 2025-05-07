@@ -11,6 +11,7 @@ import AssetManagement.AssetManagement.exception.AssetNotFoundException;
 import AssetManagement.AssetManagement.exception.UserNotFoundException;
 import AssetManagement.AssetManagement.repository.*;
 import AssetManagement.AssetManagement.util.AuthUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class AssetService {
 
     private final AssetRepository assetRepository;
@@ -212,20 +214,64 @@ public class AssetService {
     }
 
     // Save a new asset
+//        @Transactional
+//        public AssetDTO saveAsset(Asset asset) {
+//            // Validate uniqueness before saving
+//            validateUniqueFields(asset);
+//
+//            asset.setCreatedBy(AuthUtils.getAuthenticatedUserExactName());
+//            asset.setCreatedAt(LocalDateTime.now());
+//
+//            Asset savedAsset = assetRepository.save(asset);
+//
+//            return convertAssetToDto(savedAsset);
+//        }
+
+
         @Transactional
         public AssetDTO saveAsset(Asset asset) {
+            log.debug("Attempting to save asset: {}", asset);
+
             // Validate uniqueness before saving
             validateUniqueFields(asset);
+            log.debug("Validation passed for asset: {}", asset.getName());
 
-            asset.setCreatedBy(AuthUtils.getAuthenticatedUserExactName());
+            String createdBy = AuthUtils.getAuthenticatedUserExactName();
+            asset.setCreatedBy(createdBy);
             asset.setCreatedAt(LocalDateTime.now());
 
-            Asset savedAsset = assetRepository.save(asset);
+            log.debug("Setting createdBy={} and createdAt={} for asset", createdBy, asset.getCreatedAt());
 
-            return convertAssetToDto(savedAsset);
+            Asset savedAsset = assetRepository.save(asset);
+            log.debug("Asset saved with ID: {}", savedAsset.getId());
+
+            AssetDTO dto = convertAssetToDto(savedAsset);
+            log.debug("Converted Asset to DTO: {}", dto);
+
+            return dto;
         }
 
-        private void validateUniqueFields(Asset asset) {
+    @Transactional
+    public List<AssetDTO> saveAssetsBulk(List<Asset> assets) {
+        List<AssetDTO> result = new ArrayList<>();
+
+        for (Asset asset : assets) {
+            try {
+                validateUniqueFields(asset); // Optional: skip or collect invalids
+                asset.setCreatedBy(AuthUtils.getAuthenticatedUserExactName());
+                asset.setCreatedAt(LocalDateTime.now());
+
+                Asset saved = assetRepository.save(asset);
+                result.add(convertAssetToDto(saved));
+            } catch (Exception e) {
+                log.warn("Failed to save asset: {}, reason: {}", asset.getName(), e.getMessage());
+            }
+        }
+
+        return result;
+    }
+
+    private void validateUniqueFields(Asset asset) {
             Optional<Asset> existingBySerial = assetRepository.findBySerialNumber(asset.getSerialNumber());
             if (existingBySerial.isPresent() && !existingBySerial.get().getId().equals(asset.getId())) {
                 throw new IllegalArgumentException("Serial Number must be unique. Duplicate found!");

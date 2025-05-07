@@ -1,11 +1,14 @@
 package AssetManagement.AssetManagement.entity;
 
-import AssetManagement.AssetManagement.dto.TicketCategory;
+import AssetManagement.AssetManagement.enums.TicketCategory;
+import AssetManagement.AssetManagement.enums.TicketDepartment;
 import AssetManagement.AssetManagement.enums.TicketStatus;
+import jakarta.annotation.Nonnull;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.antlr.v4.runtime.misc.NotNull;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -40,6 +43,10 @@ public class Ticket {
         @ManyToOne
         @JoinColumn(name = "assignee")
         private User assignee; // Who is assigned to resolve the ticket
+
+        @Enumerated(EnumType.STRING)
+        @NotNull
+        private TicketDepartment ticketDepartment;
 
         @ManyToOne
         @JoinColumn(name="ticket_location")

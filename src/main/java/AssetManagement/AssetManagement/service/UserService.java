@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -90,6 +91,16 @@ public class UserService {
         return convertUserToDto(savedUser);
     }
 
+    public List<UserDTO> createUsers(List<User> users) {
+        List<UserDTO> createdUsers = new ArrayList<>();
+        for (User user : users) {
+            user.setRole("USER");
+            User savedUser = userRepository.save(user);
+            createdUsers.add(convertUserToDto(savedUser)); // Implement convertToDTO() if not already
+        }
+        return createdUsers;
+    }
+
     // Update an existing user
     @Transactional
     public UserDTO updateUser(Long id, UserDTO userDto) {
@@ -113,13 +124,18 @@ public class UserService {
 
     // Delete a user by ID
     public boolean deleteUser(Long id) {
-        if (userRepository.existsById(id)) {
-            userRepository.deleteById(id);
+        Optional<User> optionalUser = userRepository.findById(id);
+        System.out.println("in service method with user "+optionalUser);
+        if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+            user.setDeleted(true); // Set soft delete flag
+            userRepository.save(user); // Save updated user
+            return true;
         } else {
-            throw new RuntimeException("User not found with ID: " + id);
+            return false;
         }
-        return false;
     }
+
 
     // Convert User entity to UserDTO
 

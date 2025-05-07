@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Where;
 
 import java.util.List;
 
@@ -14,6 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
+@Where(clause = "is_deleted = false")
 public class User {
 
     @Id
@@ -52,5 +54,8 @@ public class User {
     @OneToMany(mappedBy = "assignedUser", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<Asset> assignedAssets;
+
+    @Column(nullable = false)
+    private boolean isDeleted = false; // ✅ Soft delete flag
 
 }
