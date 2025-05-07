@@ -106,6 +106,12 @@
 			<optional>true</optional>
 		</dependency>
 
+		<dependency>
+			<groupId>org.hibernate.orm</groupId>
+			<artifactId>hibernate-core</artifactId>
+		</dependency>
+
+
 		<!-- Spring Boot Configuration Processor -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

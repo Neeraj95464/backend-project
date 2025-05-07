@@ -135,16 +135,6 @@ public class UserAssetController {
             }
         }
 
-//        @GetMapping("/admin/tickets/status/{status}")
-//        public ResponseEntity<List<TicketDTO>> getAllTicketsByStatus(@PathVariable String status) {
-//            try {
-//                TicketStatus ticketStatus = TicketStatus.valueOf(status.toUpperCase());
-//                List<TicketDTO> tickets = ticketService.getAllTicketsByStatus(ticketStatus);
-//                return ResponseEntity.ok(tickets);
-//            } catch (IllegalArgumentException e) {
-//                return ResponseEntity.badRequest().body(Collections.emptyList());
-//            }
-//        }
 
     @PostMapping("/tickets")
     public ResponseEntity<TicketDTO> createTicket(@RequestBody TicketDTO ticketDTO) {

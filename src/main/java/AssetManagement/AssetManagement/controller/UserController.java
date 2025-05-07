@@ -4,8 +4,11 @@ import AssetManagement.AssetManagement.dto.PaginatedResponse;
 import AssetManagement.AssetManagement.dto.UserDTO;
 import AssetManagement.AssetManagement.entity.User;
 import AssetManagement.AssetManagement.service.UserService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 
 @RestController
@@ -54,6 +57,12 @@ public class UserController {
         return ResponseEntity.ok(createdUser);
     }
 
+    @PostMapping("/bulk")
+    public ResponseEntity<List<UserDTO>> createUsers(@RequestBody List<User> users) {
+        List<UserDTO> createdUsers = userService.createUsers(users);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdUsers);
+    }
+
     // Update an existing user
     @PutMapping("/{id}")
     public ResponseEntity<UserDTO> updateUser(@PathVariable Long id, @RequestBody UserDTO userDTO) {
@@ -67,11 +76,11 @@ public class UserController {
     // Delete a user by ID
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+        System.out.println("request received with id "+id);
         if (userService.deleteUser(id)) {
-            return ResponseEntity.noContent().build();
+            return ResponseEntity.noContent().build(); // 204 No Content if deleted
         } else {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.notFound().build(); // 404 if not found
         }
     }
-
 }

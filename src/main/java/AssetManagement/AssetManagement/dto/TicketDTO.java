@@ -1,5 +1,7 @@
 package AssetManagement.AssetManagement.dto;
 
+import AssetManagement.AssetManagement.enums.TicketCategory;
+import AssetManagement.AssetManagement.enums.TicketDepartment;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -24,6 +26,7 @@ public class TicketDTO {
     private String assetName; // ✅ Asset Name for display
     private String locationName;
     private Long location;
+    private TicketDepartment ticketDepartment;
     private List<String> ccEmails;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

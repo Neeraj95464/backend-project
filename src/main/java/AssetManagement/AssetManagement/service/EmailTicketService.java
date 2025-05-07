@@ -1,6 +1,6 @@
 package AssetManagement.AssetManagement.service;
 
-import AssetManagement.AssetManagement.dto.TicketCategory;
+import AssetManagement.AssetManagement.enums.TicketCategory;
 import AssetManagement.AssetManagement.dto.TicketDTO;
 import AssetManagement.AssetManagement.entity.Ticket;
 import AssetManagement.AssetManagement.entity.TicketMessage;
@@ -15,7 +15,6 @@ import AssetManagement.AssetManagement.util.AuthUtils;
 import jakarta.annotation.Nullable;
 import jakarta.mail.*;
 import jakarta.mail.internet.InternetAddress;
-import jakarta.mail.internet.MimeBodyPart;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.internet.MimeMultipart;
 import jakarta.persistence.EntityNotFoundException;
@@ -48,9 +47,74 @@ public class EmailTicketService {
     @Autowired
     private JavaMailSender mailSender; // Inject Spring Mail Sender
 
+//    @Scheduled(fixedRate = 60000) // Runs every 1 minute
+//    public void checkEmailsForTickets() {
+//        try {
+//            Properties properties = new Properties();
+//            properties.put("mail.store.protocol", "imaps");
+//            properties.put("mail.imaps.host", "imap.gmail.com");
+//            properties.put("mail.imaps.port", "993");
+//
+//            Session emailSession = Session.getDefaultInstance(properties);
+//            Store store = emailSession.getStore("imaps");
+//            store.connect("imap.gmail.com", "jubileehills.mahavirauto@gmail.com", "rhav ciqd ivhp gemz");
+//
+//            Folder inbox = store.getFolder("INBOX");
+//            inbox.open(Folder.READ_WRITE);
+//
+//            Message[] messages = inbox.getMessages();
+//            for (Message message : messages) {
+//                if (!message.isSet(Flags.Flag.SEEN)) { // Only process unread emails
+//                    MimeMessage mimeMessage = (MimeMessage) message;
+//                    String subject = mimeMessage.getSubject();
+//                    String senderEmail = ((InternetAddress) mimeMessage.getFrom()[0]).getAddress();
+//
+//                    List<String> ccEmails = extractRecipients(mimeMessage);
+//
+////                    System.out.println("Received Email - Subject: " + subject);
+////                    System.out.println("From: " + senderEmail);
+//                    System.out.println("CC Recipients: " + ccEmails);
+//
+//                    String content = extractTextFromMessage(mimeMessage); // Extract message text
+//                    System.out.println("Received Email - Subject: " + subject);
+//                    System.out.println("Content: " + content);
+//                    System.out.println("From: " + senderEmail);
+//
+//                    // ✅ Check if email is a reply to an existing ticket
+//                    Long ticketId = extractTicketIdFromSubject(subject);
+//                    if (ticketId != null) {
+//                        saveReplyToTicket(ticketId, senderEmail, content);
+//                    } else {
+//                        // ✅ If not a reply, create a new ticket
+//                        TicketDTO ticketDTO = createTicketFromEmail(subject, content, senderEmail);
+////                        sendAcknowledgmentEmail(mimeMessage, ticketDTO, ccEmails); // Send reply as acknowledgment
+//
+//                        sendTicketAcknowledgmentEmail(
+//                                senderEmail,
+//                                ticketRepository.findById(ticketDTO.getId()).orElseThrow(),
+//                                ccEmails,
+//                                mimeMessage.getHeader("Message-ID", null),
+//                                mimeMessage.getSubject()
+//                        );
+//
+//                    }
+//
+//                    message.setFlag(Flags.Flag.SEEN, true); // Mark as read
+//                }
+//            }
+//
+//            inbox.close(false);
+//            store.close();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//    }
 
     @Scheduled(fixedRate = 60000) // Runs every 1 minute
     public void checkEmailsForTickets() {
+        Store store = null;
+        Folder inbox = null;
+
         try {
             Properties properties = new Properties();
             properties.put("mail.store.protocol", "imaps");
@@ -58,79 +122,78 @@ public class EmailTicketService {
             properties.put("mail.imaps.port", "993");
 
             Session emailSession = Session.getDefaultInstance(properties);
-            Store store = emailSession.getStore("imaps");
-            store.connect("imap.gmail.com", "jubileehills.mahavirauto@gmail.com", "rhav ciqd ivhp gemz");
+            store = emailSession.getStore("imaps");
 
-            Folder inbox = store.getFolder("INBOX");
+            // Avoid hardcoding credentials; load from secure config or environment
+            String username = "jubileehills.mahavirauto@gmail.com";
+            String password = "rhav ciqd ivhp gemz";
+            store.connect("imap.gmail.com", username, password);
+
+            inbox = store.getFolder("INBOX");
             inbox.open(Folder.READ_WRITE);
 
-            Message[] messages = inbox.getMessages();
+            // Fetch only last 20 messages to avoid memory or server issues
+            int messageCount = inbox.getMessageCount();
+            int start = Math.max(1, messageCount - 19);
+            Message[] messages = inbox.getMessages(start, messageCount);
+
             for (Message message : messages) {
-                if (!message.isSet(Flags.Flag.SEEN)) { // Only process unread emails
-                    MimeMessage mimeMessage = (MimeMessage) message;
-                    String subject = mimeMessage.getSubject();
-                    String senderEmail = ((InternetAddress) mimeMessage.getFrom()[0]).getAddress();
+                try {
+                    Flags flags = message.getFlags();
+                    if (!flags.contains(Flags.Flag.SEEN)) {
+                        MimeMessage mimeMessage = (MimeMessage) message;
+                        String subject = mimeMessage.getSubject();
+                        String senderEmail = ((InternetAddress) mimeMessage.getFrom()[0]).getAddress();
 
-                    List<String> ccEmails = extractRecipients(mimeMessage);
+                        List<String> ccEmails = extractRecipients(mimeMessage);
+                        String content = extractTextFromMessage(mimeMessage);
 
-//                    System.out.println("Received Email - Subject: " + subject);
-//                    System.out.println("From: " + senderEmail);
-                    System.out.println("CC Recipients: " + ccEmails);
+                        System.out.println("Received Email - Subject: " + subject);
+                        System.out.println("Content: " + content);
+                        System.out.println("From: " + senderEmail);
+                        System.out.println("CC Recipients: " + ccEmails);
 
-                    String content = extractTextFromMessage(mimeMessage); // Extract message text
-                    System.out.println("Received Email - Subject: " + subject);
-                    System.out.println("Content: " + content);
-                    System.out.println("From: " + senderEmail);
+                        Long ticketId = extractTicketIdFromSubject(subject);
+                        if (ticketId != null) {
+                            saveReplyToTicket(ticketId, senderEmail, content);
+                        } else {
+                            TicketDTO ticketDTO = createTicketFromEmail(subject, content, senderEmail);
+                            sendTicketAcknowledgmentEmail(
+                                    senderEmail,
+                                    ticketRepository.findById(ticketDTO.getId()).orElseThrow(),
+                                    ccEmails,
+                                    mimeMessage.getHeader("Message-ID", null),
+                                    mimeMessage.getSubject()
+                            );
+                        }
 
-                    // ✅ Check if email is a reply to an existing ticket
-                    Long ticketId = extractTicketIdFromSubject(subject);
-                    if (ticketId != null) {
-                        saveReplyToTicket(ticketId, senderEmail, content);
-                    } else {
-                        // ✅ If not a reply, create a new ticket
-                        TicketDTO ticketDTO = createTicketFromEmail(subject, content, senderEmail);
-//                        sendAcknowledgmentEmail(mimeMessage, ticketDTO, ccEmails); // Send reply as acknowledgment
-
-                        sendTicketAcknowledgmentEmail(
-                                senderEmail,
-                                ticketRepository.findById(ticketDTO.getId()).orElseThrow(),
-                                ccEmails,
-                                mimeMessage.getHeader("Message-ID", null),
-                                mimeMessage.getSubject()
-                        );
-
+                        message.setFlag(Flags.Flag.SEEN, true); // Mark as read
                     }
-
-                    message.setFlag(Flags.Flag.SEEN, true); // Mark as read
+                } catch (Exception emailEx) {
+                    // Log but continue processing remaining emails
+                    System.err.println("Failed to process an email: " + emailEx.getMessage());
+                    emailEx.printStackTrace();
                 }
             }
 
-            inbox.close(false);
-            store.close();
         } catch (Exception e) {
+            System.err.println("Error during email polling: " + e.getMessage());
             e.printStackTrace();
+        } finally {
+            try {
+                if (inbox != null && inbox.isOpen()) {
+                    inbox.close(false);
+                }
+                if (store != null) {
+                    store.close();
+                }
+            } catch (MessagingException me) {
+                System.err.println("Error closing mail resources: " + me.getMessage());
+                me.printStackTrace();
+            }
         }
     }
 
-//    @Transactional
-//    public TicketDTO createTicketFromEmail(String emailSubject, String emailBody, String senderEmail) {
-//        Ticket ticket = new Ticket();
-//        ticket.setTitle(emailSubject); // Email subject as ticket title
-//        ticket.setDescription(emailBody); // Email body as ticket description
-//        ticket.setCategory(TicketCategory.OTHER); // Default category (update as needed)
-//        ticket.setStatus(TicketStatus.OPEN);
-//        System.out.println("your email is "+senderEmail);
-//        ticket.setEmployee(userRepository.findByEmail(senderEmail)
-//                .orElseThrow(() -> new UserNotFoundException("User not found")));
-//        System.out.println("your user is "+userRepository.findByEmail(senderEmail)
-//                .orElseThrow(() -> new UserNotFoundException("User not found")));
-//        ticket.setCreatedAt(LocalDateTime.now());
-//        ticket.setUpdatedAt(LocalDateTime.now());
-//
-//        System.out.println("your ticket is "+ticket);
-//        Ticket savedTicket = ticketRepository.save(ticket);
-//        return ticketMapper.toDTO(savedTicket);
-//    }
 
     @Transactional
     public TicketDTO createTicketFromEmail(String emailSubject, String emailBody, String senderEmail) {
@@ -371,16 +434,6 @@ public class EmailTicketService {
             String messageId = message.getMessageID();
 
             mailSender.send(message);
-
-            // Save message to DB
-//            TicketMessage replyMessage = new TicketMessage();
-//            replyMessage.setTicket(ticket);
-//            replyMessage.setSender(sender);
-//            replyMessage.setMessage(messageContent);
-//            replyMessage.setSentAt(LocalDateTime.now());
-//            replyMessage.setMessageId(messageId);
-
-//            ticketMessageRepository.save(replyMessage);
 
             System.out.printf("✅ Acknowledgment reply sent to %s%s%n",
                     recipientEmail, ccEmail != null ? " (cc: " + ccEmail + ")" : "");
