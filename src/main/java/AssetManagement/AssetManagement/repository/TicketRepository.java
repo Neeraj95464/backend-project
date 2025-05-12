@@ -7,14 +7,16 @@ import AssetManagement.AssetManagement.entity.User;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface TicketRepository extends JpaRepository<Ticket, Long> {
+public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecificationExecutor<Ticket> {
     List<Ticket> findByEmployee(User user);
 
     List<Ticket> findByAssignee(User senderUser);
@@ -23,10 +25,9 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     int countByAssignee(User assignee);
 
-    Page<Ticket> findAll(Pageable pageable);
+    Page<Ticket> findAll(Specification<Ticket> spec, Pageable pageable);
 
     Page<Ticket> findByStatus(TicketStatus status, Pageable pageable);
-
 
     Optional<Ticket> findById(Long id); // Built-in method
 

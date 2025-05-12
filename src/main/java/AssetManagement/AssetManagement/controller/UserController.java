@@ -1,5 +1,6 @@
 package AssetManagement.AssetManagement.controller;
 
+import AssetManagement.AssetManagement.dto.ChangePasswordRequest;
 import AssetManagement.AssetManagement.dto.PaginatedResponse;
 import AssetManagement.AssetManagement.dto.UserDTO;
 import AssetManagement.AssetManagement.entity.User;
@@ -82,5 +83,13 @@ public class UserController {
         } else {
             return ResponseEntity.notFound().build(); // 404 if not found
         }
+    }
+
+    @PutMapping("/{userId}/change-password")
+    public ResponseEntity<String> changePassword(
+            @PathVariable Long userId,
+            @RequestBody ChangePasswordRequest request) {
+        userService.changePassword(userId, request.getOldPassword(), request.getNewPassword());
+        return ResponseEntity.ok("Password changed successfully.");
     }
 }

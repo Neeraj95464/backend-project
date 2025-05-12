@@ -16,7 +16,7 @@ public class AuthUtils {
         AuthUtils.userRepository = userRepository;
     }
 
-    // ✅ Get authenticated username (employee ID)
+    // ✅ Get authenticated username (employee ID) it gives emp id
     public static String getAuthenticatedUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getName() != null) {
