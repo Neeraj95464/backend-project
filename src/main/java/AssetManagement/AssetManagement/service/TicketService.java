@@ -8,17 +8,21 @@ import AssetManagement.AssetManagement.exception.UserNotFoundException;
 import AssetManagement.AssetManagement.mapper.TicketMapper;
 import AssetManagement.AssetManagement.repository.*;
 import AssetManagement.AssetManagement.util.AuthUtils;
+import AssetManagement.AssetManagement.util.TicketSpecification;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -142,34 +146,40 @@ public class TicketService {
     }
 
 
-    public List<TicketDTO> searchTickets(Long ticketId, String title, String category,
-                                         TicketStatus status, String employee, String assignee,
-                                         String assetTag, Long locationId) {
+//    public List<TicketDTO> searchTickets(Long ticketId, String title, String category,
+//                                         TicketStatus status, String employee, String assignee,
+//                                         String assetTag, Long locationId) {
+//
+//        if (ticketId != null) {
+//            return ticketRepository.findById(ticketId)
+//                    .map(ticket -> List.of(convertTicketToDTO(ticket)))
+//                    .orElse(List.of());
+//        }
+//
+//        List<Ticket> tickets = ticketRepository.findAll();
+//
+//        return tickets.stream()
+//                .filter(ticket -> title == null ||
+//                        (ticket.getTitle() != null && ticket.getTitle().toLowerCase().contains(title.toLowerCase())))
+//                .filter(ticket -> category == null ||
+//                        (ticket.getCategory() != null && ticket.getCategory().name().equalsIgnoreCase(category)))
+//                .filter(ticket -> status == null || ticket.getStatus() == status)
+//                .filter(ticket -> employee == null ||
+//                        (ticket.getEmployee() != null && ticket.getEmployee().getUsername().equalsIgnoreCase(employee)))
+//                .filter(ticket -> assignee == null ||
+//                        (ticket.getAssignee() != null && ticket.getAssignee().getUsername().equalsIgnoreCase(assignee)))
+//                .filter(ticket -> assetTag == null ||
+//                        (ticket.getAsset() != null && ticket.getAsset().getAssetTag().equalsIgnoreCase(assetTag)))
+//                .filter(ticket -> locationId == null ||
+//                        (ticket.getLocation() != null && ticket.getLocation().getId().equals(locationId)))
+//                .map(this::convertTicketToDTO)
+//                .collect(Collectors.toList());
+//    }
 
-        if (ticketId != null) {
-            return ticketRepository.findById(ticketId)
-                    .map(ticket -> List.of(convertTicketToDTO(ticket)))
-                    .orElse(List.of());
-        }
-
-        List<Ticket> tickets = ticketRepository.findAll();
-
-        return tickets.stream()
-                .filter(ticket -> title == null ||
-                        (ticket.getTitle() != null && ticket.getTitle().toLowerCase().contains(title.toLowerCase())))
-                .filter(ticket -> category == null ||
-                        (ticket.getCategory() != null && ticket.getCategory().name().equalsIgnoreCase(category)))
-                .filter(ticket -> status == null || ticket.getStatus() == status)
-                .filter(ticket -> employee == null ||
-                        (ticket.getEmployee() != null && ticket.getEmployee().getUsername().equalsIgnoreCase(employee)))
-                .filter(ticket -> assignee == null ||
-                        (ticket.getAssignee() != null && ticket.getAssignee().getUsername().equalsIgnoreCase(assignee)))
-                .filter(ticket -> assetTag == null ||
-                        (ticket.getAsset() != null && ticket.getAsset().getAssetTag().equalsIgnoreCase(assetTag)))
-                .filter(ticket -> locationId == null ||
-                        (ticket.getLocation() != null && ticket.getLocation().getId().equals(locationId)))
-                .map(this::convertTicketToDTO)
-                .collect(Collectors.toList());
+    public Page<TicketDTO> searchTickets(Long ticketId, String title, Pageable pageable) {
+        Specification<Ticket> spec = TicketSpecification.getFilteredTickets(ticketId, title);
+        return ticketRepository.findAll(spec, pageable)
+                .map(this::convertTicketToDTO);
     }
 
     public PaginatedResponse<TicketDTO> getAllTicketsForAdmin(int page, int size, TicketStatus status) {
@@ -304,22 +314,60 @@ public class TicketService {
         return convertTicketToDTO(ticket);
     }
 
-    public List<TicketDTO> getUserTickets(String employeeId, TicketStatus status) {
+//    public List<TicketDTO> getUserTickets(String employeeId, TicketStatus status) {
+//        User user = userRepository.findByEmployeeId(employeeId)
+//                .orElseThrow(() -> new UserNotFoundException("User not found"));
+//
+//        List<Ticket> tickets;
+//
+//        if (status != null) {
+//            tickets = ticketRepository.findByEmployeeAndStatus(user, status);
+//            tickets.addAll(ticketRepository.findByAssigneeAndStatus(user, status)); // Also fetch assigned tickets
+//        } else {
+//            tickets = ticketRepository.findByEmployee(user);
+//            tickets.addAll(ticketRepository.findByAssignee(user)); // Also fetch assigned tickets
+//        }
+//
+//        return tickets.stream().distinct().map(this::convertTicketToDTO).collect(Collectors.toList());
+//    }
+
+    public PaginatedResponse<TicketDTO> getUserTickets(TicketStatus status, int page, int size) {
+        String employeeId =AuthUtils.getAuthenticatedUsername();
         User user = userRepository.findByEmployeeId(employeeId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
-        List<Ticket> tickets;
+        Pageable pageable = PageRequest.of(page, size);
+        List<Ticket> combinedTickets;
 
         if (status != null) {
-            tickets = ticketRepository.findByEmployeeAndStatus(user, status);
-            tickets.addAll(ticketRepository.findByAssigneeAndStatus(user, status)); // Also fetch assigned tickets
+            List<Ticket> employeeTickets = ticketRepository.findByEmployeeAndStatus(user, status);
+            List<Ticket> assigneeTickets = ticketRepository.findByAssigneeAndStatus(user, status);
+            combinedTickets = Stream.concat(employeeTickets.stream(), assigneeTickets.stream())
+                    .distinct().toList();
         } else {
-            tickets = ticketRepository.findByEmployee(user);
-            tickets.addAll(ticketRepository.findByAssignee(user)); // Also fetch assigned tickets
+            List<Ticket> employeeTickets = ticketRepository.findByEmployee(user);
+            List<Ticket> assigneeTickets = ticketRepository.findByAssignee(user);
+            combinedTickets = Stream.concat(employeeTickets.stream(), assigneeTickets.stream())
+                    .distinct().toList();
         }
 
-        return tickets.stream().distinct().map(this::convertTicketToDTO).collect(Collectors.toList());
+        // Paginate manually since we combined two lists
+        int start = Math.min(page * size, combinedTickets.size());
+        int end = Math.min(start + size, combinedTickets.size());
+        List<TicketDTO> paginatedList = combinedTickets.subList(start, end).stream()
+                .map(this::convertTicketToDTO)
+                .collect(Collectors.toList());
+
+        return new PaginatedResponse<>(
+                paginatedList,
+                page,
+                size,
+                combinedTickets.size(),
+                (int) Math.ceil((double) combinedTickets.size() / size),
+                end >= combinedTickets.size()
+        );
     }
+
 
 
     public List<TicketDTO> getUserTicketsByStatus(String employeeId, TicketStatus status) {
@@ -341,6 +389,17 @@ public class TicketService {
 
         List<Ticket> tickets = ticketRepository.findByAssignee(assigneeUser);
         return tickets.stream().map(this::convertTicketToDTO).collect(Collectors.toList());
+    }
+
+    public List<UserIdNameDTO> getAllUserIdAndNames() {
+        return locationAssignmentRepository.findAll()
+                .stream()
+                .map(la -> new UserIdNameDTO(
+                        la.getItExecutive().getEmployeeId(), // Use employeeId instead of ID
+                        la.getItExecutive().getUsername()
+                ))
+                .distinct()
+                .collect(Collectors.toList());
     }
 
     private TicketDTO convertTicketToDTO(Ticket ticket) {

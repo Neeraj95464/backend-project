@@ -9,6 +9,10 @@ import AssetManagement.AssetManagement.util.AuthUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
@@ -50,7 +54,7 @@ public class UserAssetController {
     @GetMapping("/admin/tickets")
     public ResponseEntity<PaginatedResponse<TicketDTO>> getAllTicketsForAdmin(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) TicketStatus status) {
 
         PaginatedResponse<TicketDTO> response = ticketService.getAllTicketsForAdmin(page, size, status);
@@ -58,31 +62,66 @@ public class UserAssetController {
     }
 
     @GetMapping("/search")
-    public List<TicketDTO> searchTickets(
-            @RequestParam(required = false) Long ticketId,
-            @RequestParam(required = false) String title,
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) TicketStatus status,
-            @RequestParam(required = false) String employee,
-            @RequestParam(required = false) String assignee,
-            @RequestParam(required = false) String assetTag,
-            @RequestParam(required = false) Long location) {
+    public ResponseEntity<PaginatedResponse<TicketDTO>> searchTickets(
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
 
-        return ticketService.searchTickets(ticketId, title, category, status, employee, assignee, assetTag, location);
-    }
+        // Determine if the query is a valid number (for ticketId)
+        Long ticketId = null;
+        String title = null;
 
-    @GetMapping("/tickets")
-    public ResponseEntity<List<TicketDTO>> getUserTickets(
-            @RequestParam(required = false) TicketStatus status) {
-
-        String employeeId = AuthUtils.getAuthenticatedUsername();
-        if (!StringUtils.hasText(employeeId)) {
-            return ResponseEntity.badRequest().body(Collections.emptyList());
+        if (query != null) {
+            try {
+                // Try to parse the query as a number
+                ticketId = Long.parseLong(query);
+            } catch (NumberFormatException e) {
+                // If it can't be parsed as a number, treat it as a title
+                title = query;
+            }
         }
 
-        List<TicketDTO> tickets = ticketService.getUserTickets(employeeId, status);
-        return ResponseEntity.ok(tickets);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        // Call the service method to get the paginated results
+        Page<TicketDTO> pageResult = ticketService.searchTickets(ticketId, title, pageable);
+
+        // Create the PaginatedResponse
+        PaginatedResponse<TicketDTO> response = new PaginatedResponse<>(
+                pageResult.getContent(),
+                pageResult.getNumber(),
+                pageResult.getSize(),
+                pageResult.getTotalElements(),
+                pageResult.getTotalPages(),
+                pageResult.isLast()
+        );
+
+        return ResponseEntity.ok(response);
     }
+    @GetMapping("/tickets")
+    public ResponseEntity<PaginatedResponse<TicketDTO>> getUserTickets(
+            @RequestParam(required = false) TicketStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        PaginatedResponse<TicketDTO> response = ticketService.getUserTickets( status, page, size);
+        return ResponseEntity.ok(response);
+    }
+
+
+//    @GetMapping("/tickets")
+//    public ResponseEntity<List<TicketDTO>> getUserTickets(
+//            @RequestParam(required = false) TicketStatus status) {
+//
+//        String employeeId = AuthUtils.getAuthenticatedUsername();
+//        if (!StringUtils.hasText(employeeId)) {
+//            return ResponseEntity.badRequest().body(Collections.emptyList());
+//        }
+//
+//        List<TicketDTO> tickets = ticketService.getUserTickets(employeeId, status);
+//        return ResponseEntity.ok(tickets);
+//    }
 
     @PutMapping("/{id}/update")
     public ResponseEntity<Ticket> updateTicket(
@@ -135,7 +174,6 @@ public class UserAssetController {
             }
         }
 
-
     @PostMapping("/tickets")
     public ResponseEntity<TicketDTO> createTicket(@RequestBody TicketDTO ticketDTO) {
         TicketDTO savedTicket = ticketService.createTicket(ticketDTO);
@@ -146,6 +184,12 @@ public class UserAssetController {
     public ResponseEntity<TicketDTO> assignTicket(@PathVariable Long ticketId, @PathVariable String assigneeId) {
         TicketDTO updatedTicket = ticketService.assignTicket(ticketId, assigneeId);
         return ResponseEntity.ok(updatedTicket);
+    }
+
+    @GetMapping("/assignees")
+    public ResponseEntity<List<UserIdNameDTO>> getAllUserIdAndNames() {
+        List<UserIdNameDTO> users = ticketService.getAllUserIdAndNames();
+        return ResponseEntity.ok(users);
     }
 
     @PostMapping("/tickets/{ticketId}/messages")
