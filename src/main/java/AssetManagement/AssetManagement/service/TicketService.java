@@ -19,6 +19,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -303,6 +305,30 @@ public class TicketService {
         emailTicketService.sendAcknowledgmentReplyToTicket(ticketId,message,ticket.getMessageId());
 
         return convertMessageToDTO(savedMessage);
+    }
+
+    public void updateDueDate(Long ticketId, LocalDateTime newDueDate) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new RuntimeException("Ticket not found"));
+        LocalDateTime oldDueDate=ticket.getDueDate();
+        User updater = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        ticket.setDueDate(newDueDate);
+        ticket.setUpdatedAt(LocalDateTime.now());
+        ticketRepository.save(ticket);
+
+        LocalDateTime updatedDueDate=ticket.getDueDate();
+        // Create a new TicketMessage entry for status update
+        TicketMessage message = new TicketMessage();
+        message.setTicket(ticket);
+        message.setSender(updater); // The user updating the status
+        message.setMessage("Due Date changed from " + oldDueDate + " to " + updatedDueDate);
+        message.setSentAt(LocalDateTime.now());
+        message.setStatusUpdatedBy(updater);
+
+        ticketMessageRepository.save(message);
+
     }
 
     public TicketDTO updateTicketStatus(Long ticketId, TicketStatus newStatus) {
@@ -590,24 +616,43 @@ public class TicketService {
         return new ResolutionTimeStatsDTO(avg, min, max);
     }
 
+//    public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
+//        User user = userRepository.findByEmployeeId(assigneeId)
+//                .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
+//
+//        List<Ticket> tickets = ticketRepository.findByAssignee(user);
+//
+//        List<Long> resolutionTimes = tickets.stream()
+//                .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null &&
+//                        (t.getStatus() == TicketStatus.RESOLVED || t.getStatus() == TicketStatus.CLOSED))
+//                .map(t -> java.time.Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
+//                .collect(Collectors.toList());
+//
+//        long avg = (long) resolutionTimes.stream().mapToLong(Long::longValue).average().orElse(0);
+//        long min = resolutionTimes.stream().mapToLong(Long::longValue).min().orElse(0);
+//        long max = resolutionTimes.stream().mapToLong(Long::longValue).max().orElse(0);
+//
+//        return new ResolutionTimeStatsDTO(avg, min, max);
+//    }
+
     public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
         User user = userRepository.findByEmployeeId(assigneeId)
                 .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
 
         List<Ticket> tickets = ticketRepository.findByAssignee(user);
 
-        List<Long> resolutionTimes = tickets.stream()
-                .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null &&
-                        (t.getStatus() == TicketStatus.RESOLVED || t.getStatus() == TicketStatus.CLOSED))
-                .map(t -> java.time.Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
+        List<Long> resolutionTimesInMinutes = tickets.stream()
+                .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null && t.getStatus() == TicketStatus.CLOSED)
+                .map(t -> Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
                 .collect(Collectors.toList());
 
-        long avg = (long) resolutionTimes.stream().mapToLong(Long::longValue).average().orElse(0);
-        long min = resolutionTimes.stream().mapToLong(Long::longValue).min().orElse(0);
-        long max = resolutionTimes.stream().mapToLong(Long::longValue).max().orElse(0);
+        long avg = (long) resolutionTimesInMinutes.stream().mapToLong(Long::longValue).average().orElse(0);
+        long min = resolutionTimesInMinutes.stream().mapToLong(Long::longValue).min().orElse(0);
+        long max = resolutionTimesInMinutes.stream().mapToLong(Long::longValue).max().orElse(0);
 
-        return new ResolutionTimeStatsDTO(avg, min, max);
+        return new ResolutionTimeStatsDTO(avg, min, max); // still in minutes
     }
+
 
     public List<TicketStatusTimeSeriesDTO> getTicketStatusOverTime() {
 

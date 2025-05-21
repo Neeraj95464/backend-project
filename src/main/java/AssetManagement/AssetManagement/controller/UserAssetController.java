@@ -195,6 +195,14 @@ public class UserAssetController {
         TicketMessageDTO savedMessage = ticketService.addMessage(ticketId, messageDTO.getMessage(), employeeId);
         return ResponseEntity.ok(savedMessage);
     }
+    @PutMapping("/{id}/due-date")
+    public ResponseEntity<String> updateDueDate(
+            @PathVariable Long id,
+            @RequestBody UpdateDueDateRequest request
+    ) {
+        ticketService.updateDueDate(id, request.getDueDate());
+        return ResponseEntity.ok("Due date updated successfully");
+    }
 
 
 
@@ -223,7 +231,6 @@ public class UserAssetController {
     @GetMapping("/tickets/stats/assignee")
     public ResponseEntity<Map<String, Long>> getTicketCountByAssignee() {
 
-
         Map<String, Long> stats = ticketService.getTicketCountByAssignee(); // Key = assignee name or ID
         return ResponseEntity.ok(stats);
     }
@@ -249,6 +256,5 @@ public class UserAssetController {
         List<TicketStatusTimeSeriesDTO> data = ticketService.getTicketStatusOverTime();
         return ResponseEntity.ok(data);
     }
-
 
 }
