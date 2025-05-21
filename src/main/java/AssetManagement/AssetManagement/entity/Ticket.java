@@ -25,6 +25,8 @@ public class Ticket {
         private Long id;
 
         private String title;
+
+        @Column(columnDefinition = "TEXT")
         private String description;
 
         @Enumerated(EnumType.STRING)
@@ -51,6 +53,8 @@ public class Ticket {
         @ManyToOne
         @JoinColumn(name="ticket_location")
         private Location location;
+
+        private LocalDateTime dueDate;
 
         @ElementCollection
         private List<String> ccEmails; // Store CC'd email addresses

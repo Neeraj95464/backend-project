@@ -36,5 +36,6 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
 
     List<Ticket> findByAssigneeAndStatus(User assignee, TicketStatus status);
 
+    Long countByStatus(TicketStatus status);
 }
 

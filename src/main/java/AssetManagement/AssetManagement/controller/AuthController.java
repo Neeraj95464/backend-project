@@ -2,6 +2,7 @@ package AssetManagement.AssetManagement.controller;
 
 import AssetManagement.AssetManagement.dto.ApiResponse;
 import AssetManagement.AssetManagement.dto.AuthRequest;
+import AssetManagement.AssetManagement.dto.ChangePasswordRequest;
 import AssetManagement.AssetManagement.dto.UserDTO;
 import AssetManagement.AssetManagement.entity.User;
 import AssetManagement.AssetManagement.exception.BadRequestException;
@@ -41,7 +42,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public Map<String, Object> login(@RequestBody AuthRequest authRequest) {
-//        System.out.println("Login request: " + authRequest);
+        System.out.println("Login request: " + authRequest);
 
         Optional<User> optionalUser = userRepository.findByEmployeeId(authRequest.getEmployeeId());
         if (optionalUser.isEmpty()) {
@@ -94,9 +95,10 @@ public class AuthController {
                     false, "You don't have permission to register user", null));
         }
 
+        String defaultUserPassword="test";
         User user = new User();
         user.setUsername(request.getUsername());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setPassword(passwordEncoder.encode(defaultUserPassword));
         user.setEmployeeId(request.getEmployeeId());
         user.setRole(request.getRole());
         user.setEmail(request.getEmail());
@@ -111,11 +113,41 @@ public class AuthController {
 
         return ResponseEntity.ok(new ApiResponse<>(true, "User registered successfully", null));
     }
+
+
+@PutMapping("/change-password")
+public ResponseEntity<Map<String, String>> changePassword(@RequestBody ChangePasswordRequest request) {
+    Map<String, String> response = new HashMap<>();
+
+    if (request.getOldPassword() == null || request.getNewPassword() == null) {
+        response.put("message", "Old password and new password must be provided.");
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    try {
+        changePassword(request.getOldPassword(), request.getNewPassword());
+        response.put("message", "Password changed successfully.");
+        return ResponseEntity.ok(response);
+
+    } catch (Exception e) {
+        response.put("message", "An error occurred while changing the password.");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    }
 }
 
+public void changePassword( String oldPassword, String newPassword) {
+    String userId = AuthUtils.getAuthenticatedUsername();
+    User user = userRepository.findByEmployeeId(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
 
+    if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+        throw new RuntimeException("Old password is incorrect");
+    }
 
-
+    user.setPassword(passwordEncoder.encode(newPassword));
+    userRepository.save(user);
+}
+}
 //@RestController
 //@RequestMapping("/api/auth")
 //public class AuthController {
