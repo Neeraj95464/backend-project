@@ -22,6 +22,15 @@ public enum TicketCategory {
     IPAD_TAB,
     UPS,
     WEB_APPLICATION,
-    XENTRY
+    XENTRY,
+    WORKSHOP_DIAGNOSTIC_TOOLS,
+    PRINTER,
+
+
+
+    HIRING,
+    PAYROLL,
+    POLICY,
+    PAYSLIP
 }
 

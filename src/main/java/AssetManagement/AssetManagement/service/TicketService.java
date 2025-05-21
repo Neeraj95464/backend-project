@@ -20,6 +20,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -97,6 +98,7 @@ public class TicketService {
         ticket.setCreatedAt(LocalDateTime.now());
         ticket.setUpdatedAt(LocalDateTime.now());
 
+        ticket.setDueDate(ticket.getCreatedAt().plusDays(3));
         Ticket savedTicket = ticketRepository.save(ticket);
 
         // ✅ Send acknowledgment email to the ticket creator
@@ -176,11 +178,30 @@ public class TicketService {
 //                .collect(Collectors.toList());
 //    }
 
+//    public Page<TicketDTO> searchTickets(Long ticketId, String title, Pageable pageable) {
+//        User user= userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+//                .orElseThrow((->UserNotFoundException));
+//        Specification<Ticket> spec = TicketSpecification.getFilteredTickets(ticketId, title);
+//        return ticketRepository.findAll(spec, pageable)
+//                .map(this::convertTicketToDTO);
+//    }
+
     public Page<TicketDTO> searchTickets(Long ticketId, String title, Pageable pageable) {
-        Specification<Ticket> spec = TicketSpecification.getFilteredTickets(ticketId, title);
+        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        Specification<Ticket> spec;
+
+        if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+            spec = TicketSpecification.getFilteredTickets(ticketId, title); // unrestricted
+        } else {
+            spec = TicketSpecification.getFilteredTickets(ticketId, title, user); // restricted
+        }
+
         return ticketRepository.findAll(spec, pageable)
                 .map(this::convertTicketToDTO);
     }
+
 
     public PaginatedResponse<TicketDTO> getAllTicketsForAdmin(int page, int size, TicketStatus status) {
         // Ensure only admin users can access this data
@@ -284,7 +305,6 @@ public class TicketService {
         return convertMessageToDTO(savedMessage);
     }
 
-
     public TicketDTO updateTicketStatus(Long ticketId, TicketStatus newStatus) {
         String updatedByEmployeeId = AuthUtils.getAuthenticatedUsername();
         Ticket ticket = ticketRepository.findById(ticketId)
@@ -314,29 +334,11 @@ public class TicketService {
         return convertTicketToDTO(ticket);
     }
 
-//    public List<TicketDTO> getUserTickets(String employeeId, TicketStatus status) {
-//        User user = userRepository.findByEmployeeId(employeeId)
-//                .orElseThrow(() -> new UserNotFoundException("User not found"));
-//
-//        List<Ticket> tickets;
-//
-//        if (status != null) {
-//            tickets = ticketRepository.findByEmployeeAndStatus(user, status);
-//            tickets.addAll(ticketRepository.findByAssigneeAndStatus(user, status)); // Also fetch assigned tickets
-//        } else {
-//            tickets = ticketRepository.findByEmployee(user);
-//            tickets.addAll(ticketRepository.findByAssignee(user)); // Also fetch assigned tickets
-//        }
-//
-//        return tickets.stream().distinct().map(this::convertTicketToDTO).collect(Collectors.toList());
-//    }
-
     public PaginatedResponse<TicketDTO> getUserTickets(TicketStatus status, int page, int size) {
         String employeeId =AuthUtils.getAuthenticatedUsername();
         User user = userRepository.findByEmployeeId(employeeId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
-        Pageable pageable = PageRequest.of(page, size);
         List<Ticket> combinedTickets;
 
         if (status != null) {
@@ -368,6 +370,27 @@ public class TicketService {
         );
     }
 
+    public List<String> updateCcEmail(Long ticketId, TicketCcEmailUpdateRequest request) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new EntityNotFoundException("Ticket not found with ID: " + ticketId));
+        userRepository.findByEmail(request.getEmail()).orElseThrow(() ->
+                new UserNotFoundException("User with email not found"));
+
+        List<String> ccEmails = ticket.getCcEmails();
+
+        if (request.isAdd()) {
+            if (!ccEmails.contains(request.getEmail())) {
+                ccEmails.add(request.getEmail());
+            }
+        } else {
+            ccEmails.remove(request.getEmail());
+        }
+
+        ticket.setCcEmails(ccEmails);
+        ticketRepository.save(ticket);
+
+        return ccEmails;
+    }
 
 
     public List<TicketDTO> getUserTicketsByStatus(String employeeId, TicketStatus status) {
@@ -402,40 +425,219 @@ public class TicketService {
                 .collect(Collectors.toList());
     }
 
+//    private TicketDTO convertTicketToDTO(Ticket ticket) {
+//        List<TicketMessageDTO> messages = ticketMessageRepository.findByTicket(ticket)
+//                .stream()
+//                .map(this::convertMessageToDTO)
+//                .collect(Collectors.toList());
+//
+//
+//        return new TicketDTO(
+//                ticket.getId(),
+//                ticket.getTitle(),
+//                ticket.getDescription(),
+//                ticket.getCategory(),
+//
+//                ticket.getStatus(),
+//                ticket.getEmployee() != null ? ticket.getEmployee().getUsername() : null, // ✅ Employee ID instead of username
+//                ticket.getCreatedBy(),
+//                ticket.getAssignee() != null ? ticket.getAssignee().getUsername() : null, // ✅ Assignee Username
+//                ticket.getAsset() != null ? ticket.getAsset().getAssetTag() : null, // ✅ Asset ID
+//                ticket.getAsset() != null ? ticket.getAsset().getName() : "Other", // ✅ Asset Name or "Other"
+//                ticket.getLocation() != null ? ticket.getLocation().getName():null,
+//                ticket.getLocation() != null ? ticket.getLocation().getId():null,
+//                ticket.getTicketDepartment(),
+//                ticket.getCcEmails(),
+//                ticket.getCreatedAt(),
+//                ticket.getUpdatedAt(),
+//                messages
+//
+//        );
+//    }
+
     private TicketDTO convertTicketToDTO(Ticket ticket) {
-        List<TicketMessageDTO> messages = ticketMessageRepository.findByTicket(ticket)
+        List<TicketMessage> messageEntities = ticketMessageRepository.findByTicket(ticket);
+
+        List<TicketMessageDTO> messages = messageEntities
                 .stream()
                 .map(this::convertMessageToDTO)
                 .collect(Collectors.toList());
 
-        return new TicketDTO(
+        // 1. First Responded At — first message by someone other than ticket creator
+        LocalDateTime firstRespondedAt = null;
+
+        if (ticket.getAssignee() != null) {
+            firstRespondedAt = messageEntities.stream()
+                    .filter(msg -> msg.getSender() != null
+                            && msg.getSender().getId().equals(ticket.getAssignee().getId()))
+                    .map(TicketMessage::getSentAt)
+                    .filter(Objects::nonNull)
+                    .min(LocalDateTime::compareTo)
+                    .orElse(null);
+        }
+
+
+        // 2. Last Updated — latest message or ticket updatedAt
+        LocalDateTime lastUpdated = Stream.concat(
+                        messageEntities.stream().map(TicketMessage::getSentAt),
+                        Stream.of(ticket.getUpdatedAt())
+                ).filter(Objects::nonNull)
+                .max(LocalDateTime::compareTo)
+                .orElse(ticket.getUpdatedAt());
+
+        // 3. Due Date — example: 3 business days after ticket creation
+        LocalDateTime dueDate = ticket.getCreatedAt() != null
+                ? ticket.getCreatedAt().plusDays(3)
+                : null;
+
+        // 4. Closed At — only if ticket is closed
+        LocalDateTime closedAt = (ticket.getStatus() == TicketStatus.CLOSED)
+                ? ticket.getUpdatedAt()
+                : null;
+
+        // Build DTO
+        TicketDTO dto = new TicketDTO(
                 ticket.getId(),
                 ticket.getTitle(),
                 ticket.getDescription(),
                 ticket.getCategory(),
-
                 ticket.getStatus(),
-                ticket.getEmployee() != null ? ticket.getEmployee().getUsername() : null, // ✅ Employee ID instead of username
+                ticket.getEmployee() != null ? ticket.getEmployee().getUsername() : null,
                 ticket.getCreatedBy(),
-                ticket.getAssignee() != null ? ticket.getAssignee().getUsername() : null, // ✅ Assignee Username
-                ticket.getAsset() != null ? ticket.getAsset().getAssetTag() : null, // ✅ Asset ID
-                ticket.getAsset() != null ? ticket.getAsset().getName() : "Other", // ✅ Asset Name or "Other"
-                ticket.getLocation() != null ? ticket.getLocation().getName():null,
-                ticket.getLocation() != null ? ticket.getLocation().getId():null,
+                ticket.getAssignee() != null ? ticket.getAssignee().getUsername() : null,
+                ticket.getAsset() != null ? ticket.getAsset().getAssetTag() : null,
+                ticket.getAsset() != null ? ticket.getAsset().getName() : "Other",
+                ticket.getLocation() != null ? ticket.getLocation().getName() : null,
+                ticket.getLocation() != null ? ticket.getLocation().getId() : null,
                 ticket.getTicketDepartment(),
                 ticket.getCcEmails(),
                 ticket.getCreatedAt(),
                 ticket.getUpdatedAt(),
-                messages
+                messages,
+                firstRespondedAt,
+                lastUpdated,
+                dueDate,
+                closedAt
         );
+
+        return dto;
     }
 
-    private TicketMessageDTO convertMessageToDTO(TicketMessage ticketMessage) {
+    public TicketMessageDTO convertMessageToDTO(TicketMessage ticketMessage) {
         return new TicketMessageDTO(
                 ticketMessage.getId(),
                 ticketMessage.getMessage(),
                 ticketMessage.getSender().getUsername(), // ✅ Convert User to username
                 ticketMessage.getSentAt()
         );
+    }
+
+    // data visulation part methods
+
+
+
+
+
+    public Map<TicketStatus, Long> getTicketCountByStatus() {
+        return Arrays.stream(TicketStatus.values())
+                .collect(Collectors.toMap(status -> status, status -> ticketRepository.countByStatus(status)));
+    }
+
+    public Map<String, Long> getTicketsCreatedPerDay() {
+        List<Ticket> tickets = ticketRepository.findAll();
+        Map<String, Long> stats = new TreeMap<>();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        for (Ticket ticket : tickets) {
+            String date = ticket.getCreatedAt().format(formatter);
+            stats.put(date, stats.getOrDefault(date, 0L) + 1);
+        }
+
+        return stats;
+    }
+
+    public Map<String, Long> getTicketCountByCategory() {
+        List<Ticket> tickets = ticketRepository.findAll();
+        return tickets.stream()
+                .collect(Collectors.groupingBy(
+                        t -> t.getCategory() != null ? t.getCategory().name() : "Uncategorized",
+                        Collectors.counting()
+                ));
+    }
+
+    public Map<String, Long> getTicketCountByAssignee() {
+        List<Ticket> tickets = ticketRepository.findAll();
+        return tickets.stream()
+                .collect(Collectors.groupingBy(
+                        t -> t.getAssignee() != null ? t.getAssignee().getUsername() : "Unassigned",
+                        Collectors.counting()
+                ));
+    }
+
+    public ResolutionTimeStatsDTO getResolutionTimeStats() {
+        List<Ticket> tickets = ticketRepository.findAll();
+
+        List<Long> resolutionTimes = tickets.stream()
+                .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null &&
+                        (t.getStatus() == TicketStatus.RESOLVED || t.getStatus() == TicketStatus.CLOSED))
+                .map(t -> java.time.Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
+                .collect(Collectors.toList());
+
+        long avg = (long) resolutionTimes.stream().mapToLong(Long::longValue).average().orElse(0);
+        long min = resolutionTimes.stream().mapToLong(Long::longValue).min().orElse(0);
+        long max = resolutionTimes.stream().mapToLong(Long::longValue).max().orElse(0);
+
+        return new ResolutionTimeStatsDTO(avg, min, max);
+    }
+
+    public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
+        User user = userRepository.findByEmployeeId(assigneeId)
+                .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
+
+        List<Ticket> tickets = ticketRepository.findByAssignee(user);
+
+        List<Long> resolutionTimes = tickets.stream()
+                .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null &&
+                        (t.getStatus() == TicketStatus.RESOLVED || t.getStatus() == TicketStatus.CLOSED))
+                .map(t -> java.time.Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
+                .collect(Collectors.toList());
+
+        long avg = (long) resolutionTimes.stream().mapToLong(Long::longValue).average().orElse(0);
+        long min = resolutionTimes.stream().mapToLong(Long::longValue).min().orElse(0);
+        long max = resolutionTimes.stream().mapToLong(Long::longValue).max().orElse(0);
+
+        return new ResolutionTimeStatsDTO(avg, min, max);
+    }
+
+    public List<TicketStatusTimeSeriesDTO> getTicketStatusOverTime() {
+
+        List<Ticket> tickets = ticketRepository.findAll();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        Map<String, Map<TicketStatus, Long>> dailyStatusMap = new TreeMap<>();
+
+        for (Ticket ticket : tickets) {
+            if (ticket.getCreatedAt() != null && ticket.getStatus() != null) {
+                String date = ticket.getCreatedAt().format(formatter);
+                dailyStatusMap.putIfAbsent(date, new EnumMap<>(TicketStatus.class));
+                Map<TicketStatus, Long> statusMap = dailyStatusMap.get(date);
+                statusMap.put(ticket.getStatus(), statusMap.getOrDefault(ticket.getStatus(), 0L) + 1);
+            }
+        }
+
+        List<TicketStatusTimeSeriesDTO> series = new ArrayList<>();
+        for (Map.Entry<String, Map<TicketStatus, Long>> entry : dailyStatusMap.entrySet()) {
+            series.add(new TicketStatusTimeSeriesDTO(entry.getKey(), entry.getValue()));
+        }
+
+        return series;
+    }
+
+    public Map<String, Long> getTopTicketReporters() {
+        List<Ticket> tickets = ticketRepository.findAll();
+        return tickets.stream()
+                .collect(Collectors.groupingBy(
+                        t -> t.getEmployee() != null ? t.getEmployee().getUsername() : "Unknown",
+                        Collectors.counting()
+                ));
     }
 }

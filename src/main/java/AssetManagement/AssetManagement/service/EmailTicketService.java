@@ -155,7 +155,7 @@ public class EmailTicketService {
 
                         Long ticketId = extractTicketIdFromSubject(subject);
                         if (ticketId != null) {
-                            saveReplyToTicket(ticketId, senderEmail, content);
+                            saveReplyToTicket(ticketId, senderEmail, content,ccEmails);
                         } else {
                             TicketDTO ticketDTO = createTicketFromEmail(subject, content, senderEmail);
                             sendTicketAcknowledgmentEmail(
@@ -354,9 +354,8 @@ public class EmailTicketService {
         }
     }
 
-
-
-    private void saveReplyToTicket(Long ticketId, String senderEmail, String messageContent) {
+// this method is called when we are sending mail in already created ticket to add like message.
+    private void saveReplyToTicket(Long ticketId, String senderEmail, String messageContent,List<String> ccEmails) {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new EntityNotFoundException("Ticket not found"));
 
@@ -381,7 +380,8 @@ public class EmailTicketService {
         System.out.println("✅ Saved latest reply for Ticket ID: " + ticketId);
     }
 
-
+// this below method is being use for sending acknowledgement mail to recepient when message added from
+    // portal in message section then this method is used.
     public void sendAcknowledgmentReplyToTicket(Long ticketId, String messageContent, String inReplyToMessageId) {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new EntityNotFoundException("Ticket not found"));
@@ -395,21 +395,21 @@ public class EmailTicketService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
             String recipientEmail;
-            String ccEmail = null;
+            List<String> ccEmail = null;
 
             // Determine who should be in "To" and who should be in "Cc"
             if (sender.getId().equals(ticket.getEmployee().getId())) {
                 // Sender is the employee
                 if (ticket.getAssignee() != null) {
                     recipientEmail = ticket.getAssignee().getEmail(); // Send to assignee
-                    ccEmail = sender.getEmail(); // CC the employee
+                    ccEmail = ticket.getCcEmails(); // CC the employee
                 } else {
-                    recipientEmail = "manager@example.com"; // Default recipient
+                    recipientEmail = "neerajcmb@gmail.com"; // Default recipient
                 }
             } else if (ticket.getAssignee() != null && sender.getId().equals(ticket.getAssignee().getId())) {
                 // Sender is the assignee
                 recipientEmail = ticket.getEmployee().getEmail(); // Send to employee
-                ccEmail = sender.getEmail(); // CC the assignee
+                ccEmail = ticket.getCcEmails(); // CC the assignee
             } else {
                 // Sender is neither the employee nor assignee — fallback to manager
                 recipientEmail = "kumarneerajkumar1781@gmail.com";
@@ -418,7 +418,7 @@ public class EmailTicketService {
             helper.setTo(recipientEmail);
 
             if (ccEmail != null) {
-                helper.setCc(ccEmail);
+                helper.setCc(ccEmail.toArray(new String[0]));
             }
 
             helper.setSubject("Re: Ticket ID: " + ticket.getId() + " - " + ticket.getTitle());

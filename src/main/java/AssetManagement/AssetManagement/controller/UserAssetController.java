@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/user-assets")
@@ -110,18 +111,14 @@ public class UserAssetController {
     }
 
 
-//    @GetMapping("/tickets")
-//    public ResponseEntity<List<TicketDTO>> getUserTickets(
-//            @RequestParam(required = false) TicketStatus status) {
-//
-//        String employeeId = AuthUtils.getAuthenticatedUsername();
-//        if (!StringUtils.hasText(employeeId)) {
-//            return ResponseEntity.badRequest().body(Collections.emptyList());
-//        }
-//
-//        List<TicketDTO> tickets = ticketService.getUserTickets(employeeId, status);
-//        return ResponseEntity.ok(tickets);
-//    }
+    @PutMapping("/{id}/cc-email")
+    public ResponseEntity<List<String>> updateCcEmail(
+            @PathVariable Long id,
+            @RequestBody TicketCcEmailUpdateRequest request) {
+        System.out.println("request received "+request +" "+id);
+        List<String> updatedCcList = ticketService.updateCcEmail(id, request);
+        return ResponseEntity.ok(updatedCcList);
+    }
 
     @PutMapping("/{id}/update")
     public ResponseEntity<Ticket> updateTicket(
@@ -198,4 +195,60 @@ public class UserAssetController {
         TicketMessageDTO savedMessage = ticketService.addMessage(ticketId, messageDTO.getMessage(), employeeId);
         return ResponseEntity.ok(savedMessage);
     }
+
+
+
+
+// visualise part data apies.
+
+    @GetMapping("/tickets/stats/status")
+    public ResponseEntity<Map<TicketStatus, Long>> getTicketCountByStatus() {
+        Map<TicketStatus, Long> stats = ticketService.getTicketCountByStatus();
+        return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/tickets/stats/created-per-day")
+    public ResponseEntity<Map<String, Long>> getTicketsCreatedPerDay() {
+
+        Map<String, Long> stats = ticketService.getTicketsCreatedPerDay(); // Format date as yyyy-MM-dd
+        return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/tickets/stats/category")
+    public ResponseEntity<Map<String, Long>> getTicketCountByCategory() {
+
+        Map<String, Long> stats = ticketService.getTicketCountByCategory();
+        return ResponseEntity.ok(stats);
+    }
+    @GetMapping("/tickets/stats/assignee")
+    public ResponseEntity<Map<String, Long>> getTicketCountByAssignee() {
+
+
+        Map<String, Long> stats = ticketService.getTicketCountByAssignee(); // Key = assignee name or ID
+        return ResponseEntity.ok(stats);
+    }
+    @GetMapping("/tickets/stats/resolution-time")
+    public ResponseEntity<ResolutionTimeStatsDTO> getTicketResolutionTimeStats() {
+
+        ResolutionTimeStatsDTO stats = ticketService.getResolutionTimeStats(); // avg, min, max durations
+        return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/tickets/stats/resolution/assignee/{employeeId}")
+    public ResolutionTimeStatsDTO getResolutionStatsByAssignee(@PathVariable String employeeId) {
+        return ticketService.getAssigneeResolutionStats(employeeId);
+    }
+
+    @GetMapping("/tickets/stats/top-reporters")
+    public ResponseEntity<Map<String, Long>> getTopTicketReporters() {
+        Map<String, Long> reporters = ticketService.getTopTicketReporters();
+        return ResponseEntity.ok(reporters);
+    }
+    @GetMapping("/tickets/stats/status-over-time")
+    public ResponseEntity<List<TicketStatusTimeSeriesDTO>> getTicketStatusOverTime() {
+        List<TicketStatusTimeSeriesDTO> data = ticketService.getTicketStatusOverTime();
+        return ResponseEntity.ok(data);
+    }
+
+
 }

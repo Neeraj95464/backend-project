@@ -30,6 +30,12 @@ public class TicketDTO {
     private List<String> ccEmails;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+//    private LocalDateTime respondedAt;
     private List<TicketMessageDTO> messages; // Messages for progress tracking
 
+
+    private LocalDateTime firstRespondedAt;
+    private LocalDateTime lastUpdated;
+    private LocalDateTime dueDate;
+    private LocalDateTime closedAt;
 }

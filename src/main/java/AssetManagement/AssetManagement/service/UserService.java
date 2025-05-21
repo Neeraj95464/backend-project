@@ -80,9 +80,10 @@ public class UserService {
         // Set the createdBy field with the name of the authenticated user
         user.setCreatedBy(authenticatedUser.map(User::getUsername).orElse("Unknown"));
 
+        String defaultUserPassword="test";
         // Encode and set the password
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        user.setPassword(passwordEncoder.encode(defaultUserPassword));
 
         // Assign default role
         user.setRole("USER");
@@ -103,17 +104,6 @@ public class UserService {
         return createdUsers;
     }
 
-    public void changePassword(Long userId, String oldPassword, String newPassword) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
-            throw new RuntimeException("Old password is incorrect");
-        }
-
-        user.setPassword(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
-    }
 
 
     // Update an existing user
@@ -124,7 +114,6 @@ public class UserService {
 
         // Update user fields
         existingUser.setUsername(userDto.getUsername());
-        existingUser.setPassword(userDto.getPassword());
         existingUser.setRole(userDto.getRole());
         existingUser.setEmail(userDto.getEmail());
         existingUser.setPhoneNumber(String.valueOf(userDto.getPhoneNumber()));
