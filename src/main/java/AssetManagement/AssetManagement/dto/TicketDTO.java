@@ -38,4 +38,6 @@ public class TicketDTO {
     private LocalDateTime lastUpdated;
     private LocalDateTime dueDate;
     private LocalDateTime closedAt;
+    private String attachmentPath;
+
 }

@@ -69,5 +69,8 @@ public class Ticket {
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
 
+        @Column(name = "attachment_path")
+        private String attachmentPath; // File system path to the attachment
+
 }
 

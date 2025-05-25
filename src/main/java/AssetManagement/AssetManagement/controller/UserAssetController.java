@@ -6,18 +6,28 @@ import AssetManagement.AssetManagement.enums.TicketStatus;
 import AssetManagement.AssetManagement.service.TicketService;
 import AssetManagement.AssetManagement.service.UserAssetService;
 import AssetManagement.AssetManagement.util.AuthUtils;
+import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -171,11 +181,21 @@ public class UserAssetController {
             }
         }
 
-    @PostMapping("/tickets")
-    public ResponseEntity<TicketDTO> createTicket(@RequestBody TicketDTO ticketDTO) {
-        TicketDTO savedTicket = ticketService.createTicket(ticketDTO);
+//    @PostMapping("/tickets")
+//    public ResponseEntity<TicketDTO> createTicket(@RequestBody TicketDTO ticketDTO) {
+//        TicketDTO savedTicket = ticketService.createTicket(ticketDTO);
+//        return ResponseEntity.status(HttpStatus.CREATED).body(savedTicket);
+//    }
+
+    @PostMapping(value = "/tickets", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<TicketDTO> createTicket(
+            @RequestPart("ticket") TicketDTO ticketDTO,
+            @RequestPart(value = "attachment", required = false) MultipartFile attachment) {
+
+        TicketDTO savedTicket = ticketService.createTicket(ticketDTO, attachment);
         return ResponseEntity.status(HttpStatus.CREATED).body(savedTicket);
     }
+
 
     @PutMapping("/tickets/{ticketId}/assign/{assigneeId}")
     public ResponseEntity<TicketDTO> assignTicket(@PathVariable Long ticketId, @PathVariable String assigneeId) {
@@ -203,6 +223,22 @@ public class UserAssetController {
         ticketService.updateDueDate(id, request.getDueDate());
         return ResponseEntity.ok("Due date updated successfully");
     }
+
+    @PutMapping("/{ticketId}/change-employee-if-same")
+    public ResponseEntity<String> updateEmployeeIfAssigneeSame(
+            @PathVariable Long ticketId,
+            @RequestParam String newEmployeeId) {
+
+        ticketService.updateEmployeeIfSameAsAssignee(ticketId, newEmployeeId);
+        return ResponseEntity.ok("Updation success ");
+    }
+    @GetMapping("/tickets/{id}/attachment")
+    public ResponseEntity<Resource> downloadAttachment(@PathVariable Long id) throws IOException {
+        return ticketService.downloadAttachment(id);
+    }
+
+
+
 
 
 

@@ -103,7 +103,8 @@ public class TicketMapper {
                 firstRespondedAt,
                 lastUpdated,
                 dueDate,
-                closedAt
+                closedAt,
+                ticket.getAttachmentPath()
         );
 
         return dto;

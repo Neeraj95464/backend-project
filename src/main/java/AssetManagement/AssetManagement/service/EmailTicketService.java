@@ -121,12 +121,20 @@ public class EmailTicketService {
             properties.put("mail.imaps.host", "imap.gmail.com");
             properties.put("mail.imaps.port", "993");
 
+//            properties.put("mail.store.protocol", "imaps");
+//            properties.put("mail.imaps.host", "outlook.office365.com");
+//            properties.put("mail.imaps.port", "993");
+
             Session emailSession = Session.getDefaultInstance(properties);
             store = emailSession.getStore("imaps");
 
             // Avoid hardcoding credentials; load from secure config or environment
             String username = "jubileehills.mahavirauto@gmail.com";
             String password = "rhav ciqd ivhp gemz";
+
+//            String username = "support@mahavirgroup.co";
+//            String password = "Neeraj#1234";
+
             store.connect("imap.gmail.com", username, password);
 
             inbox = store.getFolder("INBOX");
@@ -475,7 +483,7 @@ public class EmailTicketService {
                         <p>Your support ticket has been created successfully with the following details:</p>
                         <table style="border-collapse: collapse; width: 100%%;">
                             <tr><td><strong>Ticket ID:</strong></td><td>%d</td></tr>
-                            <tr><td><strong>Title:</strong></td><td>%s</td></tr>
+                            <tr><td><strong>Description:</strong></td><td>%s</td></tr>
                             <tr><td><strong>Status:</strong></td><td>%s</td></tr>
                             <tr><td><strong>Created At:</strong></td><td>%s</td></tr>
                         </table>
@@ -486,7 +494,7 @@ public class EmailTicketService {
                 </html>
                 """.formatted(
                     ticket.getId(),
-                    ticket.getTitle(),
+                    ticket.getDescription(),
                     ticket.getStatus().name(),
                     ticket.getCreatedAt().toString()
             );

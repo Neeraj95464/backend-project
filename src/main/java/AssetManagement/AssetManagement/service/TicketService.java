@@ -12,14 +12,27 @@ import AssetManagement.AssetManagement.util.TicketSpecification;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -51,8 +64,73 @@ public class TicketService {
         this.emailTicketService = emailTicketService1;
     }
 
+//    @Transactional
+//    public TicketDTO createTicket(TicketDTO ticketDTO) {
+//        Ticket ticket = new Ticket();
+//        ticket.setTitle(ticketDTO.getDescription());
+//        ticket.setDescription(ticketDTO.getDescription());
+//        ticket.setCategory(ticketDTO.getCategory());
+//        ticket.setCreatedBy(AuthUtils.getAuthenticatedUserExactName());
+//        ticket.setTicketDepartment(ticketDTO.getTicketDepartment());
+//
+//        // ✅ Fetch and set location
+//        Location location = locationRepository.findById(ticketDTO.getLocation())
+//                .orElseThrow(() -> new EntityNotFoundException("Location not found"));
+//        ticket.setLocation(location);
+//
+//        // ✅ Fetch and set employee
+//        User employeeUser = userRepository.findByEmployeeId(ticketDTO.getEmployee())
+//                .orElseThrow(() -> new EntityNotFoundException("Employee not found"));
+//        ticket.setEmployee(employeeUser);
+//
+//        // ✅ Set asset if provided
+//        assetRepository.findByAssetTag(ticketDTO.getAssetTag())
+//                .ifPresent(ticket::setAsset);
+//
+//        // ✅ Auto-assign IT executive based on location
+//        User assignee = findExecutiveByLocationAndDepartment(location.getId(),ticketDTO.getTicketDepartment());
+//        ticket.setAssignee(assignee);
+//
+//        // ✅ Set status based on whether an assignee is available
+//        if (assignee == null) {
+//            ticket.setStatus(TicketStatus.UNASSIGNED);
+//        } else {
+//            ticket.setStatus(TicketStatus.OPEN);
+//        }
+//        List<String> ccEmails = new ArrayList<>();
+//
+//// Add existing emails first, if any
+//        if (ticket.getCcEmails() != null) {
+//            ccEmails.addAll(ticket.getCcEmails());
+//        }
+//
+//        if (assignee != null) {
+//            ccEmails.add(assignee.getEmail());
+//        }
+//
+//        ticket.setCcEmails(ccEmails);
+//
+//        ticket.setCreatedAt(LocalDateTime.now());
+//        ticket.setUpdatedAt(LocalDateTime.now());
+//
+//        ticket.setDueDate(ticket.getCreatedAt().plusDays(3));
+//        Ticket savedTicket = ticketRepository.save(ticket);
+//
+//        // ✅ Send acknowledgment email to the ticket creator
+//        emailTicketService.sendTicketAcknowledgmentEmail(
+//                employeeUser.getEmail(),
+//                ticket,
+//                ticket.getCcEmails(),
+//                null,
+//                null
+//        );
+//
+//        return convertTicketToDTO(savedTicket);
+//    }
+
+
     @Transactional
-    public TicketDTO createTicket(TicketDTO ticketDTO) {
+    public TicketDTO createTicket(TicketDTO ticketDTO, MultipartFile attachment) {
         Ticket ticket = new Ticket();
         ticket.setTitle(ticketDTO.getTitle());
         ticket.setDescription(ticketDTO.getDescription());
@@ -60,60 +138,63 @@ public class TicketService {
         ticket.setCreatedBy(AuthUtils.getAuthenticatedUserExactName());
         ticket.setTicketDepartment(ticketDTO.getTicketDepartment());
 
-        // ✅ Fetch and set location
         Location location = locationRepository.findById(ticketDTO.getLocation())
                 .orElseThrow(() -> new EntityNotFoundException("Location not found"));
         ticket.setLocation(location);
 
-        // ✅ Fetch and set employee
         User employeeUser = userRepository.findByEmployeeId(ticketDTO.getEmployee())
                 .orElseThrow(() -> new EntityNotFoundException("Employee not found"));
         ticket.setEmployee(employeeUser);
 
-        // ✅ Set asset if provided
-        assetRepository.findByAssetTag(ticketDTO.getAssetTag())
-                .ifPresent(ticket::setAsset);
+        assetRepository.findByAssetTag(ticketDTO.getAssetTag()).ifPresent(ticket::setAsset);
 
-        // ✅ Auto-assign IT executive based on location
-        User assignee = findExecutiveByLocationAndDepartment(location.getId(),ticketDTO.getTicketDepartment());
+        User assignee = findExecutiveByLocationAndDepartment(location.getId(), ticketDTO.getTicketDepartment());
         ticket.setAssignee(assignee);
 
-        // ✅ Set status based on whether an assignee is available
-        if (assignee == null) {
-            ticket.setStatus(TicketStatus.UNASSIGNED);
-        } else {
-            ticket.setStatus(TicketStatus.OPEN);
-        }
+        ticket.setStatus(assignee == null ? TicketStatus.UNASSIGNED : TicketStatus.OPEN);
+
         List<String> ccEmails = new ArrayList<>();
-
-// Add existing emails first, if any
-        if (ticket.getCcEmails() != null) {
-            ccEmails.addAll(ticket.getCcEmails());
-        }
-
-        if (assignee != null) {
-            ccEmails.add(assignee.getEmail());
-        }
-
+        if (ticketDTO.getCcEmails() != null) ccEmails.addAll(ticketDTO.getCcEmails());
+        if (assignee != null) ccEmails.add(assignee.getEmail());
         ticket.setCcEmails(ccEmails);
 
         ticket.setCreatedAt(LocalDateTime.now());
         ticket.setUpdatedAt(LocalDateTime.now());
-
         ticket.setDueDate(ticket.getCreatedAt().plusDays(3));
+
+        // ✅ Save ticket first to get its ID
         Ticket savedTicket = ticketRepository.save(ticket);
 
-        // ✅ Send acknowledgment email to the ticket creator
+        // ✅ Store the file if uploaded
+        if (attachment != null && !attachment.isEmpty()) {
+            String uploadDir = "uploads/tickets/";
+            new File(uploadDir).mkdirs(); // Ensure directory exists
+
+            String filename = savedTicket.getId() + "_" + attachment.getOriginalFilename();
+            Path filePath = Paths.get(uploadDir, filename);
+
+            try {
+                Files.write(filePath, attachment.getBytes());
+                savedTicket.setAttachmentPath(filePath.toString());
+                ticketRepository.save(savedTicket); // Save path
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to store attachment", e);
+            }
+        }
+
+        // ✅ Send acknowledgment email
         emailTicketService.sendTicketAcknowledgmentEmail(
                 employeeUser.getEmail(),
-                ticket,
-                ticket.getCcEmails(),
+                savedTicket,
+                ccEmails,
                 null,
                 null
         );
 
         return convertTicketToDTO(savedTicket);
     }
+
+
     public TicketDTO getTicketById(Long id) {
         Ticket ticket = ticketRepository.findById(id)
                 .orElse(null);
@@ -331,6 +412,62 @@ public class TicketService {
 
     }
 
+    public void updateEmployeeIfSameAsAssignee(Long ticketId, String newEmployeeId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new EntityNotFoundException("Ticket not found with id " + ticketId));
+
+//        if (ticket.getAssignee() != null && ticket.getEmployee() != null &&
+//                ticket.getAssignee().getId().equals(ticket.getEmployee().getId())) {
+
+            User newEmployee = userRepository.findByEmployeeId(newEmployeeId)
+                    .orElseThrow(() -> new EntityNotFoundException("User not found with id " + newEmployeeId));
+
+            String oldEmployee=ticket.getEmployee().getUsername();
+            ticket.setEmployee(newEmployee);
+            ticket.setUpdatedAt(LocalDateTime.now());
+             ticketRepository.save(ticket);
+//        }
+        User updater=userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(()-> new UserNotFoundException("Authenticated user not found "));
+
+        // Create a new TicketMessage entry for status update
+        TicketMessage message = new TicketMessage();
+        message.setTicket(ticket);
+        message.setSender(updater); // The user updating the status
+        message.setMessage("Employee changed from " + oldEmployee + " to " + newEmployeeId);
+        message.setSentAt(LocalDateTime.now());
+        message.setStatusUpdatedBy(updater);
+
+        ticketMessageRepository.save(message);
+
+//        return ticket; // No change
+    }
+
+    public ResponseEntity<Resource> downloadAttachment(Long ticketId) throws IOException {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new EntityNotFoundException("Ticket not found"));
+
+        if (ticket.getAttachmentPath() == null) {
+            throw new FileNotFoundException("Attachment not found for this ticket");
+        }
+
+        Path path = Paths.get(ticket.getAttachmentPath());
+        String fileName = path.getFileName().toString();
+        String contentType = Files.probeContentType(path); // auto-detect content type
+
+        Resource resource = new UrlResource(path.toUri());
+
+//        System.out.println("Content-Disposition: attachment; filename=\"" + fileName + "\"");
+//        System.out.println("Content-Type: " + contentType);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType != null ? contentType : "application/octet-stream"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .body(resource);
+    }
+
+
+
     public TicketDTO updateTicketStatus(Long ticketId, TicketStatus newStatus) {
         String updatedByEmployeeId = AuthUtils.getAuthenticatedUsername();
         Ticket ticket = ticketRepository.findById(ticketId)
@@ -543,7 +680,8 @@ public class TicketService {
                 firstRespondedAt,
                 lastUpdated,
                 dueDate,
-                closedAt
+                closedAt,
+                ticket.getAttachmentPath()
         );
 
         return dto;
