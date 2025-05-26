@@ -36,6 +36,8 @@ public class Ticket {
         private TicketStatus status; // Open, In Progress, Resolved, Closed
 
         private String messageId;
+        private String internetMessageId;
+
         @ManyToOne
         @JoinColumn(name = "employee")
         private User employee; // User who created the ticket

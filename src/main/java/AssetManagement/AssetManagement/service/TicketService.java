@@ -51,9 +51,9 @@ public class TicketService {
     private final LocationAssignmentRepository locationAssignmentRepository;
     private final TicketMapper ticketMapper;
     private final LocationRepository locationRepository;
-    private final EmailTicketService emailTicketService;
+    private final EmailService emailTicketService;
 
-    public TicketService(TicketRepository ticketRepository, TicketMessageRepository ticketMessageRepository, UserRepository userRepository, AssetRepository assetRepository, LocationAssignmentRepository locationAssignmentRepository, TicketMapper ticketMapper, LocationRepository locationRepository, EmailTicketService emailTicketService, EmailTicketService emailTicketService1) {
+    public TicketService(TicketRepository ticketRepository, TicketMessageRepository ticketMessageRepository, UserRepository userRepository, AssetRepository assetRepository, LocationAssignmentRepository locationAssignmentRepository, TicketMapper ticketMapper, LocationRepository locationRepository, EmailService emailTicketService, EmailService emailTicketService1) {
         this.ticketRepository = ticketRepository;
         this.ticketMessageRepository = ticketMessageRepository;
         this.userRepository = userRepository;
@@ -64,69 +64,6 @@ public class TicketService {
         this.emailTicketService = emailTicketService1;
     }
 
-//    @Transactional
-//    public TicketDTO createTicket(TicketDTO ticketDTO) {
-//        Ticket ticket = new Ticket();
-//        ticket.setTitle(ticketDTO.getDescription());
-//        ticket.setDescription(ticketDTO.getDescription());
-//        ticket.setCategory(ticketDTO.getCategory());
-//        ticket.setCreatedBy(AuthUtils.getAuthenticatedUserExactName());
-//        ticket.setTicketDepartment(ticketDTO.getTicketDepartment());
-//
-//        // ✅ Fetch and set location
-//        Location location = locationRepository.findById(ticketDTO.getLocation())
-//                .orElseThrow(() -> new EntityNotFoundException("Location not found"));
-//        ticket.setLocation(location);
-//
-//        // ✅ Fetch and set employee
-//        User employeeUser = userRepository.findByEmployeeId(ticketDTO.getEmployee())
-//                .orElseThrow(() -> new EntityNotFoundException("Employee not found"));
-//        ticket.setEmployee(employeeUser);
-//
-//        // ✅ Set asset if provided
-//        assetRepository.findByAssetTag(ticketDTO.getAssetTag())
-//                .ifPresent(ticket::setAsset);
-//
-//        // ✅ Auto-assign IT executive based on location
-//        User assignee = findExecutiveByLocationAndDepartment(location.getId(),ticketDTO.getTicketDepartment());
-//        ticket.setAssignee(assignee);
-//
-//        // ✅ Set status based on whether an assignee is available
-//        if (assignee == null) {
-//            ticket.setStatus(TicketStatus.UNASSIGNED);
-//        } else {
-//            ticket.setStatus(TicketStatus.OPEN);
-//        }
-//        List<String> ccEmails = new ArrayList<>();
-//
-//// Add existing emails first, if any
-//        if (ticket.getCcEmails() != null) {
-//            ccEmails.addAll(ticket.getCcEmails());
-//        }
-//
-//        if (assignee != null) {
-//            ccEmails.add(assignee.getEmail());
-//        }
-//
-//        ticket.setCcEmails(ccEmails);
-//
-//        ticket.setCreatedAt(LocalDateTime.now());
-//        ticket.setUpdatedAt(LocalDateTime.now());
-//
-//        ticket.setDueDate(ticket.getCreatedAt().plusDays(3));
-//        Ticket savedTicket = ticketRepository.save(ticket);
-//
-//        // ✅ Send acknowledgment email to the ticket creator
-//        emailTicketService.sendTicketAcknowledgmentEmail(
-//                employeeUser.getEmail(),
-//                ticket,
-//                ticket.getCcEmails(),
-//                null,
-//                null
-//        );
-//
-//        return convertTicketToDTO(savedTicket);
-//    }
 
 
     @Transactional
@@ -383,7 +320,8 @@ public class TicketService {
         ticketMessage.setSentAt(LocalDateTime.now());
 
         TicketMessage savedMessage = ticketMessageRepository.save(ticketMessage);
-        emailTicketService.sendAcknowledgmentReplyToTicket(ticketId,message,ticket.getMessageId());
+        emailTicketService.sendAcknowledgmentReplyToTicket
+                (ticketId,message,ticket.getInternetMessageId());
 
         return convertMessageToDTO(savedMessage);
     }
