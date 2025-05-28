@@ -2,6 +2,7 @@ package AssetManagement.AssetManagement.service;
 
 import AssetManagement.AssetManagement.dto.*;
 import AssetManagement.AssetManagement.entity.*;
+import AssetManagement.AssetManagement.enums.TicketCategory;
 import AssetManagement.AssetManagement.enums.TicketDepartment;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import AssetManagement.AssetManagement.exception.UserNotFoundException;
@@ -73,7 +74,19 @@ public class TicketService {
         ticket.setDescription(ticketDTO.getDescription());
         ticket.setCategory(ticketDTO.getCategory());
         ticket.setCreatedBy(AuthUtils.getAuthenticatedUserExactName());
-        ticket.setTicketDepartment(ticketDTO.getTicketDepartment());
+//        ticket.setTicketDepartment(ticketDTO.getTicketDepartment());
+
+        TicketCategory category = ticketDTO.getCategory();
+
+        if (category == TicketCategory.CCTV || category == TicketCategory.UPS) {
+            String deptName = category.name();
+            System.out.println("Setting department from category: " + deptName);
+            ticket.setTicketDepartment(TicketDepartment.valueOf(deptName));
+        } else {
+            System.out.println("Setting department from DTO: " + ticketDTO.getTicketDepartment());
+            ticket.setTicketDepartment(ticketDTO.getTicketDepartment());
+        }
+
 
         Location location = locationRepository.findById(ticketDTO.getLocation())
                 .orElseThrow(() -> new EntityNotFoundException("Location not found"));
@@ -85,7 +98,7 @@ public class TicketService {
 
         assetRepository.findByAssetTag(ticketDTO.getAssetTag()).ifPresent(ticket::setAsset);
 
-        User assignee = findExecutiveByLocationAndDepartment(location.getId(), ticketDTO.getTicketDepartment());
+        User assignee = findExecutiveByLocationAndDepartment(location.getId(), ticket.getTicketDepartment());
         ticket.setAssignee(assignee);
 
         ticket.setStatus(assignee == null ? TicketStatus.UNASSIGNED : TicketStatus.OPEN);
@@ -435,10 +448,55 @@ public class TicketService {
         return convertTicketToDTO(ticket);
     }
 
-    public PaginatedResponse<TicketDTO> getUserTickets(TicketStatus status, int page, int size) {
-        String employeeId =AuthUtils.getAuthenticatedUsername();
-        User user = userRepository.findByEmployeeId(employeeId)
-                .orElseThrow(() -> new UserNotFoundException("User not found"));
+//    public PaginatedResponse<TicketDTO> getUserTickets(TicketStatus status, int page, int size) {
+//        String employeeId =AuthUtils.getAuthenticatedUsername();
+//        User user = userRepository.findByEmployeeId(employeeId)
+//                .orElseThrow(() -> new UserNotFoundException("User not found"));
+//
+//        List<Ticket> combinedTickets;
+//
+//        if (status != null) {
+//            List<Ticket> employeeTickets = ticketRepository.findByEmployeeAndStatus(user, status);
+//            List<Ticket> assigneeTickets = ticketRepository.findByAssigneeAndStatus(user, status);
+//            combinedTickets = Stream.concat(employeeTickets.stream(), assigneeTickets.stream())
+//                    .distinct().toList();
+//        } else {
+//            List<Ticket> employeeTickets = ticketRepository.findByEmployee(user);
+//            List<Ticket> assigneeTickets = ticketRepository.findByAssignee(user);
+//            combinedTickets = Stream.concat(employeeTickets.stream(), assigneeTickets.stream())
+//                    .distinct().toList();
+//        }
+//
+//        // Paginate manually since we combined two lists
+//        int start = Math.min(page * size, combinedTickets.size());
+//        int end = Math.min(start + size, combinedTickets.size());
+//        List<TicketDTO> paginatedList = combinedTickets.subList(start, end).stream()
+//                .map(this::convertTicketToDTO)
+//                .collect(Collectors.toList());
+//
+//        return new PaginatedResponse<>(
+//                paginatedList,
+//                page,
+//                size,
+//                combinedTickets.size(),
+//                (int) Math.ceil((double) combinedTickets.size() / size),
+//                end >= combinedTickets.size()
+//        );
+//    }
+
+
+    public PaginatedResponse<TicketDTO> getUserTickets(TicketStatus status, String employeeId, int page, int size) {
+        User user;
+
+        // Determine the user context
+        if ("ALL".equalsIgnoreCase(employeeId)) {
+            String authenticatedEmployeeId = AuthUtils.getAuthenticatedUsername();
+            user = userRepository.findByEmployeeId(authenticatedEmployeeId)
+                    .orElseThrow(() -> new UserNotFoundException("Authenticated user not found"));
+        } else {
+            user = userRepository.findByEmployeeId(employeeId)
+                    .orElseThrow(() -> new UserNotFoundException("Specified user not found"));
+        }
 
         List<Ticket> combinedTickets;
 
@@ -454,7 +512,7 @@ public class TicketService {
                     .distinct().toList();
         }
 
-        // Paginate manually since we combined two lists
+        // Manual pagination
         int start = Math.min(page * size, combinedTickets.size());
         int end = Math.min(start + size, combinedTickets.size());
         List<TicketDTO> paginatedList = combinedTickets.subList(start, end).stream()
@@ -470,6 +528,14 @@ public class TicketService {
                 end >= combinedTickets.size()
         );
     }
+
+
+    public List<TicketDTO> getAllTickets() {
+        return ticketRepository.findAll().stream()
+                .map(this::convertTicketToDTO)
+                .collect(Collectors.toList());
+    }
+
 
     public List<String> updateCcEmail(Long ticketId, TicketCcEmailUpdateRequest request) {
         Ticket ticket = ticketRepository.findById(ticketId)

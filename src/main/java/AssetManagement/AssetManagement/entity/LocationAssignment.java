@@ -21,6 +21,10 @@ public class LocationAssignment {
     private User itExecutive;  // ✅ IT Executive
 
     @ManyToOne
+    @JoinColumn(name="manager_id",nullable = false)
+    private User locationManager;
+
+    @ManyToOne
     @JoinColumn(name = "location_id", nullable = false)
     private Location location; // ✅ Assigned Location
 

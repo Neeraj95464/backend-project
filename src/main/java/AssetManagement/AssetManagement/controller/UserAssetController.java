@@ -7,6 +7,11 @@ import AssetManagement.AssetManagement.service.TicketService;
 import AssetManagement.AssetManagement.service.UserAssetService;
 import AssetManagement.AssetManagement.util.AuthUtils;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletResponse;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,9 +33,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/user-assets")
@@ -110,14 +118,82 @@ public class UserAssetController {
 
         return ResponseEntity.ok(response);
     }
+//    @GetMapping("/tickets")
+//    public ResponseEntity<PaginatedResponse<TicketDTO>> getUserTickets(
+//            @RequestParam(required = false) TicketStatus status,
+//            @RequestParam(defaultValue = "0") int page,
+//            @RequestParam(defaultValue = "10") int size
+//    ) {
+//        PaginatedResponse<TicketDTO> response = ticketService.getUserTickets( status, page, size);
+//        return ResponseEntity.ok(response);
+//    }
+
     @GetMapping("/tickets")
     public ResponseEntity<PaginatedResponse<TicketDTO>> getUserTickets(
             @RequestParam(required = false) TicketStatus status,
+            @RequestParam(required = false, defaultValue = "ALL") String employeeId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        PaginatedResponse<TicketDTO> response = ticketService.getUserTickets( status, page, size);
+        PaginatedResponse<TicketDTO> response = ticketService.getUserTickets(status, employeeId, page, size);
         return ResponseEntity.ok(response);
+    }
+
+
+    @GetMapping("/tickets/download-this-month")
+    public void downloadTicketsThisMonth(HttpServletResponse response) throws IOException {
+        List<TicketDTO> allTickets = ticketService.getAllTickets(); // Use your method that fetches all tickets
+
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime now = LocalDateTime.now();
+
+        List<TicketDTO> filteredTickets = allTickets.stream()
+                .filter(ticket -> ticket.getCreatedAt() != null &&
+                        !ticket.getCreatedAt().isBefore(startOfMonth) &&
+                        !ticket.getCreatedAt().isAfter(now))
+                .collect(Collectors.toList());
+
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition", "attachment; filename=tickets_this_month.xlsx");
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Tickets");
+
+            String[] headers = {
+                    "ID", "Title", "Description", "Category", "Status", "Employee", "Created By",
+                    "Assignee", "Asset Tag", "Asset Name", "Location", "Department",
+                    "Created At", "Updated At", "Due Date", "Closed At"
+            };
+
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                headerRow.createCell(i).setCellValue(headers[i]);
+            }
+
+            int rowNum = 1;
+            for (TicketDTO dto : filteredTickets) {
+                Row row = sheet.createRow(rowNum++);
+                row.createCell(0).setCellValue(dto.getId());
+                row.createCell(1).setCellValue(dto.getTitle());
+                row.createCell(2).setCellValue(dto.getDescription());
+                row.createCell(3).setCellValue(dto.getCategory() != null ? dto.getCategory().name() : "");
+                row.createCell(4).setCellValue(dto.getStatus() != null ? dto.getStatus().name() : "");
+                row.createCell(5).setCellValue(dto.getEmployee());
+                row.createCell(6).setCellValue(dto.getCreatedBy());
+                row.createCell(7).setCellValue(dto.getAssignee());
+                row.createCell(8).setCellValue(dto.getAssetTag());
+                row.createCell(9).setCellValue(dto.getAssetName());
+                row.createCell(10).setCellValue(dto.getLocationName());
+                row.createCell(11).setCellValue(dto.getTicketDepartment() != null ? dto.getTicketDepartment().name() : "");
+                row.createCell(12).setCellValue(dto.getCreatedAt() != null ? dto.getCreatedAt().toString() : "");
+                row.createCell(13).setCellValue(dto.getUpdatedAt() != null ? dto.getUpdatedAt().toString() : "");
+                row.createCell(14).setCellValue(dto.getDueDate() != null ? dto.getDueDate().toString() : "");
+                row.createCell(15).setCellValue(dto.getClosedAt() != null ? dto.getClosedAt().toString() : "");
+            }
+
+            workbook.write(response.getOutputStream());
+        }
     }
 
 

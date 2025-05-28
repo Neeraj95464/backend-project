@@ -4,5 +4,7 @@ public enum TicketDepartment {
     IT,
     HR,
     ADMIN,
-    FINANCE
+    FINANCE,
+    CCTV,
+    UPS
 }

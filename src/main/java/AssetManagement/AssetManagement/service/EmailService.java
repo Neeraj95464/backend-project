@@ -628,7 +628,6 @@ public class EmailService {
                 ticket.setInternetMessageId(draft.internetMessageId);  // <-- Add this field in Ticket entity
                 ticketRepository.save(ticket);
 
-
                 graphClient
                         .users("support@mahavirgroup.co")
                         .messages(draft.id)
@@ -644,7 +643,6 @@ public class EmailService {
             e.printStackTrace();
         }
     }
-
 
 }
 
