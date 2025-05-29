@@ -10,6 +10,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
+@Table(
+        name = "location_assignment",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"location_id", "ticket_department"})
+)
 public class LocationAssignment {
 
     @Id

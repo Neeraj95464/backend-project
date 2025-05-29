@@ -1,5 +1,6 @@
 package AssetManagement.AssetManagement.entity;
 
+import AssetManagement.AssetManagement.enums.TicketMessageType;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -40,4 +41,8 @@ public class TicketMessage {
 
     @Column(unique = true)
     private String messageId; // ✅ Stores email Message-ID for threading
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TicketMessageType ticketMessageType; // NEW: PUBLIC_RESPONSE or INTERNAL_NOTE
 }

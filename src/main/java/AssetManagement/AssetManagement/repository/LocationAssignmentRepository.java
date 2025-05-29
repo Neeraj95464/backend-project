@@ -21,5 +21,13 @@ public interface LocationAssignmentRepository extends JpaRepository<LocationAssi
     @Query("SELECT la.itExecutive FROM LocationAssignment la WHERE la.location.id = :locationId AND la.ticketDepartment = :department")
     List<User> findExecutivesByLocationAndDepartment(@Param("locationId") Long locationId, @Param("department") TicketDepartment department);
 
+
+    List<LocationAssignment> findByLocation(Location location);
+
+    Optional<LocationAssignment> findByLocationAndTicketDepartment(Location location, TicketDepartment ticketDepartment);
+
+    @Query("SELECT la.locationManager FROM LocationAssignment la WHERE la.location = :location AND la.ticketDepartment = :department")
+    User findLocationManagerByLocationAndTicketDepartment(@Param("location") Location location, @Param("department") TicketDepartment department);
+
 }
 

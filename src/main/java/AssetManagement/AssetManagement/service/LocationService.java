@@ -16,6 +16,10 @@ public class LocationService {
         this.locationRepository = locationRepository;
     }
 
+    public List<Location> getAllLocations() {
+        return locationRepository.findAll();
+    }
+
     public List<Location> findByName(String name) {
         return locationRepository.findByNameContainingIgnoreCase(name);
     }
@@ -30,5 +34,7 @@ public class LocationService {
     public Location createLocation(Location location) {
         return locationRepository.save(location);
     }
+
+
 }
 

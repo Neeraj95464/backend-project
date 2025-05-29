@@ -115,14 +115,15 @@ public class TicketMapper {
                 ticketMessage.getId(),
                 ticketMessage.getMessage(),
                 ticketMessage.getSender().getUsername(), // ✅ Convert User to username
-                ticketMessage.getSentAt()
+                ticketMessage.getSentAt(),
+                ticketMessage.getTicketMessageType()
         );
     }
 
     private List<TicketMessageDTO> mapMessagesToDTO(List<TicketMessage> messages) {
         if (messages == null) return null;
         return messages.stream()
-                .map(msg -> new TicketMessageDTO(msg.getId(), msg.getMessage(), msg.getSender().getUsername(), msg.getSentAt()))
+                .map(msg -> new TicketMessageDTO(msg.getId(), msg.getMessage(), msg.getSender().getUsername(), msg.getSentAt(),msg.getTicketMessageType()))
                 .collect(Collectors.toList());
     }
 

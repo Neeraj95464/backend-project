@@ -16,7 +16,6 @@ public class LocationController {
     @Autowired
     private LocationService locationService;
 
-
     @GetMapping("/search")
     public ResponseEntity<List<Location>> searchLocations(
             @RequestParam(value = "name") String name) {
@@ -44,5 +43,10 @@ public class LocationController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error occurred while creating the location: " + e.getMessage());
         }
+    }
+
+    @GetMapping
+    public List<Location> getAllLocations() {
+        return locationService.getAllLocations();
     }
 }

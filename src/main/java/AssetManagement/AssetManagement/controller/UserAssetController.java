@@ -1,6 +1,7 @@
 package AssetManagement.AssetManagement.controller;
 
 import AssetManagement.AssetManagement.dto.*;
+import AssetManagement.AssetManagement.entity.LocationAssignment;
 import AssetManagement.AssetManagement.entity.Ticket;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import AssetManagement.AssetManagement.service.TicketService;
@@ -135,6 +136,7 @@ public class UserAssetController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
+        System.out.println("Request came with employee id to fetch tickets "+employeeId);
         PaginatedResponse<TicketDTO> response = ticketService.getUserTickets(status, employeeId, page, size);
         return ResponseEntity.ok(response);
     }
@@ -231,6 +233,7 @@ public class UserAssetController {
             @RequestParam TicketStatus status) {
 
         try {
+//            System.out.println("request came to close "+ticketId +" "+status);
             TicketDTO updatedTicket = ticketService.updateTicketStatus(ticketId, status);
             return ResponseEntity.ok(updatedTicket);
         } catch (IllegalArgumentException e) {
@@ -287,10 +290,11 @@ public class UserAssetController {
 
     @PostMapping("/tickets/{ticketId}/messages")
     public ResponseEntity<TicketMessageDTO> addMessage(@PathVariable Long ticketId, @RequestBody TicketMessageDTO messageDTO) {
-        String employeeId = AuthUtils.getAuthenticatedUsername();
-        TicketMessageDTO savedMessage = ticketService.addMessage(ticketId, messageDTO.getMessage(), employeeId);
+
+        TicketMessageDTO savedMessage = ticketService.addMessage(ticketId,messageDTO);
         return ResponseEntity.ok(savedMessage);
     }
+
     @PutMapping("/{id}/due-date")
     public ResponseEntity<String> updateDueDate(
             @PathVariable Long id,
@@ -312,6 +316,30 @@ public class UserAssetController {
     public ResponseEntity<Resource> downloadAttachment(@PathVariable Long id) throws IOException {
         return ticketService.downloadAttachment(id);
     }
+
+    @PostMapping("/location-assignments")
+    public ResponseEntity<LocationAssignment> assignLocation(
+            @RequestBody LocationAssignmentRequest request
+    ) {
+        return ticketService.assignLocation(request);
+    }
+
+    @GetMapping("/all/locations-assignments")
+    public List<LocationAssignmentDTO> getAllAssignments() {
+        return ticketService.getAllAssignments();
+    }
+
+    @PostMapping("/assign")
+    public ResponseEntity<String> assign(@RequestBody LocationAssignmentRequest request) {
+        ticketService.assignLocation(request);
+        return ResponseEntity.ok("Assignment successful");
+    }
+
+
+
+
+
+
 
 
 

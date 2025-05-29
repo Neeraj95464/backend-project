@@ -4,6 +4,7 @@ import AssetManagement.AssetManagement.dto.*;
 import AssetManagement.AssetManagement.entity.*;
 import AssetManagement.AssetManagement.enums.TicketCategory;
 import AssetManagement.AssetManagement.enums.TicketDepartment;
+import AssetManagement.AssetManagement.enums.TicketMessageType;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import AssetManagement.AssetManagement.exception.UserNotFoundException;
 import AssetManagement.AssetManagement.mapper.TicketMapper;
@@ -11,7 +12,6 @@ import AssetManagement.AssetManagement.repository.*;
 import AssetManagement.AssetManagement.util.AuthUtils;
 import AssetManagement.AssetManagement.util.TicketSpecification;
 import jakarta.persistence.EntityNotFoundException;
-import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -30,7 +30,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -48,16 +47,18 @@ public class TicketService {
     private final TicketRepository ticketRepository;
     private final TicketMessageRepository ticketMessageRepository;
     private final UserRepository userRepository;
+    private final TicketFeedbackRepository ticketFeedbackRepository;
     private final AssetRepository assetRepository;
     private final LocationAssignmentRepository locationAssignmentRepository;
     private final TicketMapper ticketMapper;
     private final LocationRepository locationRepository;
     private final EmailService emailTicketService;
 
-    public TicketService(TicketRepository ticketRepository, TicketMessageRepository ticketMessageRepository, UserRepository userRepository, AssetRepository assetRepository, LocationAssignmentRepository locationAssignmentRepository, TicketMapper ticketMapper, LocationRepository locationRepository, EmailService emailTicketService, EmailService emailTicketService1) {
+    public TicketService(TicketRepository ticketRepository, TicketMessageRepository ticketMessageRepository, UserRepository userRepository, TicketFeedbackRepository ticketFeedbackRepository, AssetRepository assetRepository, LocationAssignmentRepository locationAssignmentRepository, TicketMapper ticketMapper, LocationRepository locationRepository, EmailService emailTicketService, EmailService emailTicketService1) {
         this.ticketRepository = ticketRepository;
         this.ticketMessageRepository = ticketMessageRepository;
         this.userRepository = userRepository;
+        this.ticketFeedbackRepository = ticketFeedbackRepository;
         this.assetRepository = assetRepository;
         this.locationAssignmentRepository = locationAssignmentRepository;
         this.ticketMapper = ticketMapper;
@@ -90,6 +91,7 @@ public class TicketService {
 
         Location location = locationRepository.findById(ticketDTO.getLocation())
                 .orElseThrow(() -> new EntityNotFoundException("Location not found"));
+
         ticket.setLocation(location);
 
         User employeeUser = userRepository.findByEmployeeId(ticketDTO.getEmployee())
@@ -101,11 +103,15 @@ public class TicketService {
         User assignee = findExecutiveByLocationAndDepartment(location.getId(), ticket.getTicketDepartment());
         ticket.setAssignee(assignee);
 
+        User locationManager = locationAssignmentRepository.findLocationManagerByLocationAndTicketDepartment
+                (location,ticket.getTicketDepartment());
+
         ticket.setStatus(assignee == null ? TicketStatus.UNASSIGNED : TicketStatus.OPEN);
 
         List<String> ccEmails = new ArrayList<>();
         if (ticketDTO.getCcEmails() != null) ccEmails.addAll(ticketDTO.getCcEmails());
         if (assignee != null) ccEmails.add(assignee.getEmail());
+        if (locationManager != null) ccEmails.add(locationManager.getEmail());
         ticket.setCcEmails(ccEmails);
 
         ticket.setCreatedAt(LocalDateTime.now());
@@ -181,44 +187,6 @@ public class TicketService {
     }
 
 
-//    public List<TicketDTO> searchTickets(Long ticketId, String title, String category,
-//                                         TicketStatus status, String employee, String assignee,
-//                                         String assetTag, Long locationId) {
-//
-//        if (ticketId != null) {
-//            return ticketRepository.findById(ticketId)
-//                    .map(ticket -> List.of(convertTicketToDTO(ticket)))
-//                    .orElse(List.of());
-//        }
-//
-//        List<Ticket> tickets = ticketRepository.findAll();
-//
-//        return tickets.stream()
-//                .filter(ticket -> title == null ||
-//                        (ticket.getTitle() != null && ticket.getTitle().toLowerCase().contains(title.toLowerCase())))
-//                .filter(ticket -> category == null ||
-//                        (ticket.getCategory() != null && ticket.getCategory().name().equalsIgnoreCase(category)))
-//                .filter(ticket -> status == null || ticket.getStatus() == status)
-//                .filter(ticket -> employee == null ||
-//                        (ticket.getEmployee() != null && ticket.getEmployee().getUsername().equalsIgnoreCase(employee)))
-//                .filter(ticket -> assignee == null ||
-//                        (ticket.getAssignee() != null && ticket.getAssignee().getUsername().equalsIgnoreCase(assignee)))
-//                .filter(ticket -> assetTag == null ||
-//                        (ticket.getAsset() != null && ticket.getAsset().getAssetTag().equalsIgnoreCase(assetTag)))
-//                .filter(ticket -> locationId == null ||
-//                        (ticket.getLocation() != null && ticket.getLocation().getId().equals(locationId)))
-//                .map(this::convertTicketToDTO)
-//                .collect(Collectors.toList());
-//    }
-
-//    public Page<TicketDTO> searchTickets(Long ticketId, String title, Pageable pageable) {
-//        User user= userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
-//                .orElseThrow((->UserNotFoundException));
-//        Specification<Ticket> spec = TicketSpecification.getFilteredTickets(ticketId, title);
-//        return ticketRepository.findAll(spec, pageable)
-//                .map(this::convertTicketToDTO);
-//    }
-
     public Page<TicketDTO> searchTickets(Long ticketId, String title, Pageable pageable) {
         User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
@@ -268,17 +236,6 @@ public class TicketService {
         );
     }
 
-//    private User findITExecutiveByLocation(Long locationId) {
-//        // Fetch all IT executives responsible for this location
-//        List<User> executives = locationAssignmentRepository.findExecutivesByLocation(locationId);
-//
-//        if (executives.isEmpty()) {
-//            return null; // ❌ No IT executive available for this location
-//        }
-//        return executives.stream()
-//                .min(Comparator.comparingInt(this::getAssignedTicketsCount))
-//                .orElse(null);
-//    }
 
     private User findExecutiveByLocationAndDepartment(Long locationId, TicketDepartment department) {
         // Fetch executives responsible for the given department and location
@@ -319,7 +276,8 @@ public class TicketService {
     }
 
     @Transactional
-    public TicketMessageDTO addMessage(Long ticketId, String message, String employeeId) {
+    public TicketMessageDTO addMessage(Long ticketId, TicketMessageDTO ticketMessageDTO) {
+        String employeeId = AuthUtils.getAuthenticatedUsername();
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new RuntimeException("Ticket not found"));
 
@@ -328,13 +286,22 @@ public class TicketService {
 
         TicketMessage ticketMessage = new TicketMessage();
         ticketMessage.setTicket(ticket);
-        ticketMessage.setMessage(message);
+        ticketMessage.setMessage(ticketMessageDTO.getMessage());
         ticketMessage.setSender(senderUser);
         ticketMessage.setSentAt(LocalDateTime.now());
+        ticketMessage.setTicketMessageType(ticketMessageDTO.getTicketMessageType());
 
         TicketMessage savedMessage = ticketMessageRepository.save(ticketMessage);
-        emailTicketService.sendAcknowledgmentReplyToTicket
-                (ticketId,message,ticket.getInternetMessageId());
+
+        // modify the rule of send mail to internal
+        if(savedMessage.getTicketMessageType()== TicketMessageType.INTERNAL_NOTE){
+            emailTicketService.sendInternalMail(senderUser.getEmail(),savedMessage.getMessage()
+            ,ticket.getCcEmails());
+
+        }else {
+            emailTicketService.sendAcknowledgmentReplyToTicket
+                    (ticketId,savedMessage.getMessage(),ticket.getInternetMessageId());
+        }
 
         return convertMessageToDTO(savedMessage);
     }
@@ -408,14 +375,186 @@ public class TicketService {
 
         Resource resource = new UrlResource(path.toUri());
 
-//        System.out.println("Content-Disposition: attachment; filename=\"" + fileName + "\"");
-//        System.out.println("Content-Type: " + contentType);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType != null ? contentType : "application/octet-stream"))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                 .body(resource);
     }
+
+
+    public List<LocationAssignmentDTO> getAllAssignments() {
+        List<Location> locations = locationRepository.findAll();
+
+        return locations.stream().map(location -> {
+            List<LocationAssignment> assignments = locationAssignmentRepository.findByLocation(location);
+
+            // Pick the assignment for the desired department or just the first one if only one is needed
+            LocationAssignment assignment = assignments.stream()
+                    .filter(a -> a.getTicketDepartment() == TicketDepartment.IT) // example, adjust as needed
+                    .findFirst()
+                    .orElse(null);
+
+            TicketDepartment ticketDepartment = assignment != null ? assignment.getTicketDepartment() : TicketDepartment.IT;
+
+            String executiveUsername = (assignment != null && assignment.getItExecutive() != null && assignment.getItExecutive().getUsername() != null)
+                    ? assignment.getItExecutive().getUsername()
+                    : "null";
+
+            String managerUsername = (assignment != null && assignment.getLocationManager() != null && assignment.getLocationManager().getUsername() != null)
+                    ? assignment.getLocationManager().getUsername()
+                    : "null";
+
+
+            return new LocationAssignmentDTO(
+                    location.getId(),
+                    location.getName(),
+                    ticketDepartment,
+                    executiveUsername,
+                    managerUsername
+            );
+        }).toList();
+    }
+
+    @Transactional
+    public ResponseEntity<LocationAssignment> assignLocation(LocationAssignmentRequest request) {
+        System.out.println("Request was " + request);
+
+        User executive = userRepository.findByEmployeeId(request.getExecutiveEmployeeId())
+                .orElseThrow(() -> new RuntimeException("Executive not found"));
+
+        User manager = userRepository.findByEmployeeId(request.getManagerEmployeeId())
+                .orElseThrow(() -> new RuntimeException("Manager not found"));
+
+        Location location = locationRepository.findById(request.getLocationId())
+                .orElseThrow(() -> new RuntimeException("Location not found"));
+
+        // Delete existing assignment for that location and department
+        locationAssignmentRepository.findByLocationAndTicketDepartment(location, request.getTicketDepartment())
+                .ifPresent(existing -> {
+                    locationAssignmentRepository.delete(existing);
+                    locationAssignmentRepository.flush(); // Force immediate execution of DELETE
+                    System.out.println("Deleted old assignment with ID = " + existing.getId());
+                });
+
+        // Save new assignment
+        LocationAssignment assignment = new LocationAssignment();
+        assignment.setItExecutive(executive);
+        assignment.setLocationManager(manager);
+        assignment.setLocation(location);
+        assignment.setTicketDepartment(request.getTicketDepartment());
+
+        LocationAssignment savedAssignment = locationAssignmentRepository.save(assignment);
+        System.out.println("Saved Assignment ID = " + savedAssignment.getId());
+
+        return ResponseEntity.ok(savedAssignment);
+    }
+
+
+    public ResponseEntity<String> updateFedback(Long ticketId, int rating) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new RuntimeException("Ticket not found"));
+
+        Optional<TicketFeedback> existingFeedback = ticketFeedbackRepository.findByTicket(ticket);
+
+        if (existingFeedback.isPresent()) {
+            return ResponseEntity.ok(
+                    "<html><body><h2>You have already submitted feedback for this ticket. 🙏</h2></body></html>"
+            );
+        }
+
+        TicketFeedback feedback = new TicketFeedback();
+        feedback.setTicket(ticket);
+        feedback.setRating(rating);
+        feedback.setSubmittedAt(LocalDateTime.now());
+
+        ticketFeedbackRepository.save(feedback);
+
+        return ResponseEntity.ok(
+                "<html><body><h2>Thank you for your feedback! ⭐</h2></body></html>"
+        );
+    }
+
+
+    public String generateFeedbackEmailHtml(Long ticketId) {
+        String baseUrl = "https://numerous-gem-accompanied-mac.trycloudflare.com/api/feedback"; // Your backend API endpoint
+
+        return """
+        <html>
+        <body style="font-family: Arial, sans-serif;">
+            <p>Hello,</p>
+            <p>Your support ticket <strong>#%d</strong> has been resolved.</p>
+            <p>We would love to hear your feedback!</p>
+            <p>Please click a star below to rate your experience:</p>
+
+            <p style="font-size: 24px;">
+                <a href="%s?ticketId=%d&rating=1">⭐</a>
+                <a href="%s?ticketId=%d&rating=2">⭐</a>
+                <a href="%s?ticketId=%d&rating=3">⭐</a>
+                <a href="%s?ticketId=%d&rating=4">⭐</a>
+                <a href="%s?ticketId=%d&rating=5">⭐</a>
+            </p>
+
+            <p>Thank you!<br>IT Support Team</p>
+        </body>
+        </html>
+        """.formatted(
+                ticketId,
+                baseUrl, ticketId,
+                baseUrl, ticketId,
+                baseUrl, ticketId,
+                baseUrl, ticketId,
+                baseUrl, ticketId
+        );
+    }
+
+
+
+
+
+    @Transactional
+//    public ResponseEntity<LocationAssignment> assignLocation(LocationAssignmentRequest request){
+//        System.out.println("Request was " + request);
+//
+//        // 1. Validate Executive
+//        User executive = userRepository.findByEmployeeId(request.getExecutiveEmployeeId())
+//                .orElseThrow(() -> new RuntimeException("Executive not found"));
+//
+//        // 2. Validate Manager
+//        User manager = userRepository.findByEmployeeId(request.getManagerEmployeeId())
+//                .orElseThrow(() -> new RuntimeException("Manager not found"));
+//
+//        // 3. Validate Location
+//        Location location = locationRepository.findById(request.getLocationId())
+//                .orElseThrow(() -> new RuntimeException("Location not found"));
+//
+//        // 4. Delete existing assignment for this location + ticket department
+//        Optional<LocationAssignment> existingAssignmentOpt =
+//                locationAssignmentRepository.findByLocationAndTicketDepartment(location, request.getTicketDepartment());
+//
+//        existingAssignmentOpt.ifPresent(existing -> {
+//            locationAssignmentRepository.delete(existing);
+//            System.out.println("Deleted old assignment with ID = " + existing.getId());
+//        });
+//
+//        // 5. Create and Save new Assignment
+//        LocationAssignment assignment = new LocationAssignment();
+//        assignment.setItExecutive(executive);
+//        assignment.setLocationManager(manager);
+//        assignment.setLocation(location);
+//        assignment.setTicketDepartment(request.getTicketDepartment());
+//
+//        LocationAssignment savedAssignment = locationAssignmentRepository.save(assignment);
+//        System.out.println("Saved Assignment ID = " + savedAssignment.getId());
+//
+//        return ResponseEntity.ok(savedAssignment);
+//    }
+
+
+
+
+
+
 
 
 
@@ -432,7 +571,7 @@ public class TicketService {
         ticket.setUpdatedAt(LocalDateTime.now());
 
         // Save ticket first before creating message
-        ticketRepository.save(ticket);
+        Ticket savedTicket = ticketRepository.save(ticket);
 
         // Create a new TicketMessage entry for status update
         TicketMessage message = new TicketMessage();
@@ -442,47 +581,20 @@ public class TicketService {
         message.setSentAt(LocalDateTime.now());
         message.setStatusUpdate(newStatus);
         message.setStatusUpdatedBy(updater);
+        message.setTicketMessageType(TicketMessageType.PUBLIC_RESPONSE);
 
         ticketMessageRepository.save(message);
+
+
+        String toEmail = ticket.getEmployee().getEmail();
+        String subject = "Your Ticket #" + ticket.getId() + " Has Been Closed – Please Rate Us";
+        String feedbackHtml = generateFeedbackEmailHtml(ticket.getId());
+
+        emailTicketService.sendEmailViaGraph(toEmail, subject, feedbackHtml, null);
 
         return convertTicketToDTO(ticket);
     }
 
-//    public PaginatedResponse<TicketDTO> getUserTickets(TicketStatus status, int page, int size) {
-//        String employeeId =AuthUtils.getAuthenticatedUsername();
-//        User user = userRepository.findByEmployeeId(employeeId)
-//                .orElseThrow(() -> new UserNotFoundException("User not found"));
-//
-//        List<Ticket> combinedTickets;
-//
-//        if (status != null) {
-//            List<Ticket> employeeTickets = ticketRepository.findByEmployeeAndStatus(user, status);
-//            List<Ticket> assigneeTickets = ticketRepository.findByAssigneeAndStatus(user, status);
-//            combinedTickets = Stream.concat(employeeTickets.stream(), assigneeTickets.stream())
-//                    .distinct().toList();
-//        } else {
-//            List<Ticket> employeeTickets = ticketRepository.findByEmployee(user);
-//            List<Ticket> assigneeTickets = ticketRepository.findByAssignee(user);
-//            combinedTickets = Stream.concat(employeeTickets.stream(), assigneeTickets.stream())
-//                    .distinct().toList();
-//        }
-//
-//        // Paginate manually since we combined two lists
-//        int start = Math.min(page * size, combinedTickets.size());
-//        int end = Math.min(start + size, combinedTickets.size());
-//        List<TicketDTO> paginatedList = combinedTickets.subList(start, end).stream()
-//                .map(this::convertTicketToDTO)
-//                .collect(Collectors.toList());
-//
-//        return new PaginatedResponse<>(
-//                paginatedList,
-//                page,
-//                size,
-//                combinedTickets.size(),
-//                (int) Math.ceil((double) combinedTickets.size() / size),
-//                end >= combinedTickets.size()
-//        );
-//    }
 
 
     public PaginatedResponse<TicketDTO> getUserTickets(TicketStatus status, String employeeId, int page, int size) {
@@ -592,35 +704,6 @@ public class TicketService {
                 .collect(Collectors.toList());
     }
 
-//    private TicketDTO convertTicketToDTO(Ticket ticket) {
-//        List<TicketMessageDTO> messages = ticketMessageRepository.findByTicket(ticket)
-//                .stream()
-//                .map(this::convertMessageToDTO)
-//                .collect(Collectors.toList());
-//
-//
-//        return new TicketDTO(
-//                ticket.getId(),
-//                ticket.getTitle(),
-//                ticket.getDescription(),
-//                ticket.getCategory(),
-//
-//                ticket.getStatus(),
-//                ticket.getEmployee() != null ? ticket.getEmployee().getUsername() : null, // ✅ Employee ID instead of username
-//                ticket.getCreatedBy(),
-//                ticket.getAssignee() != null ? ticket.getAssignee().getUsername() : null, // ✅ Assignee Username
-//                ticket.getAsset() != null ? ticket.getAsset().getAssetTag() : null, // ✅ Asset ID
-//                ticket.getAsset() != null ? ticket.getAsset().getName() : "Other", // ✅ Asset Name or "Other"
-//                ticket.getLocation() != null ? ticket.getLocation().getName():null,
-//                ticket.getLocation() != null ? ticket.getLocation().getId():null,
-//                ticket.getTicketDepartment(),
-//                ticket.getCcEmails(),
-//                ticket.getCreatedAt(),
-//                ticket.getUpdatedAt(),
-//                messages
-//
-//        );
-//    }
 
     private TicketDTO convertTicketToDTO(Ticket ticket) {
         List<TicketMessage> messageEntities = ticketMessageRepository.findByTicket(ticket);
@@ -696,7 +779,8 @@ public class TicketService {
                 ticketMessage.getId(),
                 ticketMessage.getMessage(),
                 ticketMessage.getSender().getUsername(), // ✅ Convert User to username
-                ticketMessage.getSentAt()
+                ticketMessage.getSentAt(),
+                ticketMessage.getTicketMessageType()
         );
     }
 
@@ -758,24 +842,6 @@ public class TicketService {
         return new ResolutionTimeStatsDTO(avg, min, max);
     }
 
-//    public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
-//        User user = userRepository.findByEmployeeId(assigneeId)
-//                .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
-//
-//        List<Ticket> tickets = ticketRepository.findByAssignee(user);
-//
-//        List<Long> resolutionTimes = tickets.stream()
-//                .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null &&
-//                        (t.getStatus() == TicketStatus.RESOLVED || t.getStatus() == TicketStatus.CLOSED))
-//                .map(t -> java.time.Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
-//                .collect(Collectors.toList());
-//
-//        long avg = (long) resolutionTimes.stream().mapToLong(Long::longValue).average().orElse(0);
-//        long min = resolutionTimes.stream().mapToLong(Long::longValue).min().orElse(0);
-//        long max = resolutionTimes.stream().mapToLong(Long::longValue).max().orElse(0);
-//
-//        return new ResolutionTimeStatsDTO(avg, min, max);
-//    }
 
     public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
         User user = userRepository.findByEmployeeId(assigneeId)

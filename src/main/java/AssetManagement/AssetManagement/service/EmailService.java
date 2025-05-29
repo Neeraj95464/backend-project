@@ -380,6 +380,67 @@ public class EmailService {
     }
 
 
+    public void sendInternalMail(String senderEmail, String messagePreview, List<String> ccEmails) {
+        // Build TO recipient (sender)
+        Recipient toRecipient = new Recipient();
+        EmailAddress senderAddress = new EmailAddress();
+        senderAddress.address = senderEmail;
+        toRecipient.emailAddress = senderAddress;
+
+        // Build CC recipients
+        List<Recipient> ccRecipients = new ArrayList<>();
+        if (ccEmails != null && !ccEmails.isEmpty()) {
+            for (String ccEmail : ccEmails) {
+                Recipient ccRecipient = new Recipient();
+                EmailAddress ccAddress = new EmailAddress();
+                ccAddress.address = ccEmail;
+                ccRecipient.emailAddress = ccAddress;
+                ccRecipients.add(ccRecipient);
+            }
+        }
+
+        // Attractive HTML body
+        String bodyHtml = """
+        <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                <div style="max-width: 600px; margin: auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                    <h2 style="color: #004aad;">📩 Ticket Update</h2>
+                    <p style="font-size: 16px; color: #333333;">
+                        %s
+                    </p>
+                    <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
+                    <p style="font-size: 14px; color: #888888;">
+                        Please do not reply to this email directly. For more info, visit your ticket portal.
+                    </p>
+                </div>
+            </body>
+        </html>
+    """.formatted(messagePreview);
+
+        // Create and send message
+        Message message = new Message();
+        message.subject = "Ticket Notification";  // You can hardcode or make dynamic
+        ItemBody body = new ItemBody();
+        body.contentType = BodyType.HTML;
+        body.content = bodyHtml;
+        message.body = body;
+        message.toRecipients = List.of(toRecipient);
+        message.ccRecipients = ccRecipients;
+
+        graphClient
+                .users("support@mahavirgroup.co")
+                .sendMail(UserSendMailParameterSet
+                        .newBuilder()
+                        .withMessage(message)
+                        .withSaveToSentItems(true)
+                        .build())
+                .buildRequest()
+                .post();
+
+        System.out.println("✅ Styled email sent to " + senderEmail + " with CC: " + ccEmails);
+    }
+
+
 
 
 
@@ -422,6 +483,7 @@ public class EmailService {
             // Step 2: Determine To and CC logic
             String recipientEmail;
             Set<String> ccSet = new HashSet<>();
+
 
             if (sender.getId().equals(ticket.getEmployee().getId())) {
                 // Employee is replying
@@ -643,6 +705,8 @@ public class EmailService {
             e.printStackTrace();
         }
     }
+
+
 
 }
 

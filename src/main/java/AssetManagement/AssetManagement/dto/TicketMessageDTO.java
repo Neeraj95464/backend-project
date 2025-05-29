@@ -2,6 +2,7 @@ package AssetManagement.AssetManagement.dto;
 
 
 import AssetManagement.AssetManagement.entity.User;
+import AssetManagement.AssetManagement.enums.TicketMessageType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,6 +18,7 @@ public class TicketMessageDTO {
     private String message;
     private String sender; // ✅ Use String for username instead of User object
     private LocalDateTime sentAt;
+    private TicketMessageType ticketMessageType;
 }
 
 
