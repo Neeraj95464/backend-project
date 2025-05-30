@@ -18,6 +18,7 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -213,12 +214,15 @@ public class TicketService {
 
         Page<Ticket> ticketPage;
 
+        // Create PageRequest with sorting by createdAt in descending order
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
         if (status != null) {
             // Fetch tickets based on status
-            ticketPage = ticketRepository.findByStatus(status, PageRequest.of(page, size));
+            ticketPage = ticketRepository.findByStatus(status, pageRequest);
         } else {
             // Fetch all tickets
-            ticketPage = ticketRepository.findAll(PageRequest.of(page, size));
+            ticketPage = ticketRepository.findAll(pageRequest);
         }
 
         List<TicketDTO> ticketDTOs = ticketPage.getContent().stream()
@@ -257,8 +261,14 @@ public class TicketService {
 
     @Transactional
     public TicketDTO assignTicket(Long ticketId, String empId) {
+
+        User updater= userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(() -> new UserNotFoundException("user not found with to update assignee"));
+
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new RuntimeException("Ticket not found"));
+
+        User oldTicketAssignee = ticket.getAssignee();
 
         User assignee = userRepository.findByEmployeeId(empId)
                 .orElseThrow(() -> new RuntimeException("Assignee user not found"));
@@ -272,6 +282,18 @@ public class TicketService {
             ticket.setStatus(TicketStatus.OPEN);
         }
         Ticket updatedTicket = ticketRepository.save(ticket);
+
+        TicketMessage message = new TicketMessage();
+        message.setTicket(updatedTicket);
+        message.setSender(updater); // The user updating the status
+        message.setMessage("Ticket assignee changed from " + oldTicketAssignee.getUsername() + " to " + updatedTicket.getAssignee().getUsername());
+        message.setSentAt(LocalDateTime.now());
+        message.setStatusUpdatedBy(updater);
+        message.setTicketMessageType(TicketMessageType.PUBLIC_RESPONSE);
+
+        ticketMessageRepository.save(message);
+
+
         return convertTicketToDTO(updatedTicket);
     }
 
@@ -325,6 +347,7 @@ public class TicketService {
         message.setMessage("Due Date changed from " + oldDueDate + " to " + updatedDueDate);
         message.setSentAt(LocalDateTime.now());
         message.setStatusUpdatedBy(updater);
+        message.setTicketMessageType(TicketMessageType.PUBLIC_RESPONSE);
 
         ticketMessageRepository.save(message);
 
@@ -512,49 +535,6 @@ public class TicketService {
 
 
 
-    @Transactional
-//    public ResponseEntity<LocationAssignment> assignLocation(LocationAssignmentRequest request){
-//        System.out.println("Request was " + request);
-//
-//        // 1. Validate Executive
-//        User executive = userRepository.findByEmployeeId(request.getExecutiveEmployeeId())
-//                .orElseThrow(() -> new RuntimeException("Executive not found"));
-//
-//        // 2. Validate Manager
-//        User manager = userRepository.findByEmployeeId(request.getManagerEmployeeId())
-//                .orElseThrow(() -> new RuntimeException("Manager not found"));
-//
-//        // 3. Validate Location
-//        Location location = locationRepository.findById(request.getLocationId())
-//                .orElseThrow(() -> new RuntimeException("Location not found"));
-//
-//        // 4. Delete existing assignment for this location + ticket department
-//        Optional<LocationAssignment> existingAssignmentOpt =
-//                locationAssignmentRepository.findByLocationAndTicketDepartment(location, request.getTicketDepartment());
-//
-//        existingAssignmentOpt.ifPresent(existing -> {
-//            locationAssignmentRepository.delete(existing);
-//            System.out.println("Deleted old assignment with ID = " + existing.getId());
-//        });
-//
-//        // 5. Create and Save new Assignment
-//        LocationAssignment assignment = new LocationAssignment();
-//        assignment.setItExecutive(executive);
-//        assignment.setLocationManager(manager);
-//        assignment.setLocation(location);
-//        assignment.setTicketDepartment(request.getTicketDepartment());
-//
-//        LocationAssignment savedAssignment = locationAssignmentRepository.save(assignment);
-//        System.out.println("Saved Assignment ID = " + savedAssignment.getId());
-//
-//        return ResponseEntity.ok(savedAssignment);
-//    }
-
-
-
-
-
-
 
 
 
@@ -586,16 +566,64 @@ public class TicketService {
         ticketMessageRepository.save(message);
 
 
-        String toEmail = ticket.getEmployee().getEmail();
-        String subject = "Your Ticket #" + ticket.getId() + " Has Been Closed – Please Rate Us";
-        String feedbackHtml = generateFeedbackEmailHtml(ticket.getId());
+        if (!savedTicket.getAssignee().equals(savedTicket.getEmployee())) {
+            String toEmail = ticket.getEmployee().getEmail();
+            String subject = "Your Ticket #" + ticket.getId() + " Has Been Closed – Please Rate Us";
+            String feedbackHtml = generateFeedbackEmailHtml(ticket.getId());
 
-        emailTicketService.sendEmailViaGraph(toEmail, subject, feedbackHtml, null);
+            emailTicketService.sendEmailViaGraph(toEmail, subject, feedbackHtml, null);
+        }
+
 
         return convertTicketToDTO(ticket);
     }
 
 
+
+//    public PaginatedResponse<TicketDTO> getUserTickets(TicketStatus status, String employeeId, int page, int size) {
+//        User user;
+//
+//        // Determine the user context
+//        if ("ALL".equalsIgnoreCase(employeeId)) {
+//            String authenticatedEmployeeId = AuthUtils.getAuthenticatedUsername();
+//            user = userRepository.findByEmployeeId(authenticatedEmployeeId)
+//                    .orElseThrow(() -> new UserNotFoundException("Authenticated user not found"));
+//        } else {
+//            user = userRepository.findByEmployeeId(employeeId)
+//                    .orElseThrow(() -> new UserNotFoundException("Specified user not found"));
+//        }
+//
+//        List<Ticket> combinedTickets;
+//
+//        if (status != null) {
+//            List<Ticket> employeeTickets = ticketRepository.findByEmployeeAndStatus(user, status);
+//            List<Ticket> assigneeTickets = ticketRepository.findByAssigneeAndStatus(user, status);
+//            combinedTickets = Stream.concat(employeeTickets.stream(), assigneeTickets.stream())
+//                    .distinct().toList();
+//        } else {
+//            List<Ticket> employeeTickets = ticketRepository.findByEmployee(user);
+//            List<Ticket> assigneeTickets = ticketRepository.findByAssignee(user);
+//            combinedTickets = Stream.concat(employeeTickets.stream(), assigneeTickets.stream())
+//                    .distinct().toList();
+//        }
+//
+//        // Manual pagination
+//        int start = Math.min(page * size, combinedTickets.size());
+//        int end = Math.min(start + size, combinedTickets.size());
+//        List<TicketDTO> paginatedList = combinedTickets.subList(start, end).stream()
+//                .map(this::convertTicketToDTO)
+//                .collect(Collectors.toList());
+//
+//        return new PaginatedResponse<>(
+//                paginatedList,
+//                page,
+//                size,
+//                combinedTickets.size(),
+//                (int) Math.ceil((double) combinedTickets.size() / size),
+//                end >= combinedTickets.size()
+//        );
+//    }
+//
 
     public PaginatedResponse<TicketDTO> getUserTickets(TicketStatus status, String employeeId, int page, int size) {
         User user;
@@ -616,17 +644,22 @@ public class TicketService {
             List<Ticket> employeeTickets = ticketRepository.findByEmployeeAndStatus(user, status);
             List<Ticket> assigneeTickets = ticketRepository.findByAssigneeAndStatus(user, status);
             combinedTickets = Stream.concat(employeeTickets.stream(), assigneeTickets.stream())
-                    .distinct().toList();
+                    .distinct()
+                    .sorted(Comparator.comparing(Ticket::getCreatedAt).reversed()) // Sort by createdAt descending
+                    .toList();
         } else {
             List<Ticket> employeeTickets = ticketRepository.findByEmployee(user);
             List<Ticket> assigneeTickets = ticketRepository.findByAssignee(user);
             combinedTickets = Stream.concat(employeeTickets.stream(), assigneeTickets.stream())
-                    .distinct().toList();
+                    .distinct()
+                    .sorted(Comparator.comparing(Ticket::getCreatedAt).reversed()) // Sort by createdAt descending
+                    .toList();
         }
 
         // Manual pagination
         int start = Math.min(page * size, combinedTickets.size());
         int end = Math.min(start + size, combinedTickets.size());
+
         List<TicketDTO> paginatedList = combinedTickets.subList(start, end).stream()
                 .map(this::convertTicketToDTO)
                 .collect(Collectors.toList());
@@ -640,6 +673,8 @@ public class TicketService {
                 end >= combinedTickets.size()
         );
     }
+
+
 
 
     public List<TicketDTO> getAllTickets() {

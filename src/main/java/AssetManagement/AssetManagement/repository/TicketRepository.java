@@ -5,6 +5,7 @@ import AssetManagement.AssetManagement.entity.Location;
 import AssetManagement.AssetManagement.entity.Ticket;
 import AssetManagement.AssetManagement.entity.User;
 import AssetManagement.AssetManagement.enums.TicketStatus;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -28,10 +29,14 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
 
     int countByAssignee(User assignee);
 
+    @NotNull
     Page<Ticket> findAll(Specification<Ticket> spec, Pageable pageable);
 
     Page<Ticket> findByStatus(TicketStatus status, Pageable pageable);
 
+    List<Ticket> findByStatus(TicketStatus status);
+
+    @NotNull
     Optional<Ticket> findById(Long id); // Built-in method
 
     List<Ticket> findByTitleContainingIgnoreCaseOrCategoryOrStatusOrEmployeeOrAssigneeOrAsset_AssetTagOrLocation(

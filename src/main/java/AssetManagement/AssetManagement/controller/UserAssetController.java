@@ -260,11 +260,6 @@ public class UserAssetController {
             }
         }
 
-//    @PostMapping("/tickets")
-//    public ResponseEntity<TicketDTO> createTicket(@RequestBody TicketDTO ticketDTO) {
-//        TicketDTO savedTicket = ticketService.createTicket(ticketDTO);
-//        return ResponseEntity.status(HttpStatus.CREATED).body(savedTicket);
-//    }
 
     @PostMapping(value = "/tickets", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<TicketDTO> createTicket(
