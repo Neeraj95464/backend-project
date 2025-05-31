@@ -3,6 +3,7 @@ package AssetManagement.AssetManagement.controller;
 import AssetManagement.AssetManagement.dto.*;
 import AssetManagement.AssetManagement.entity.LocationAssignment;
 import AssetManagement.AssetManagement.entity.Ticket;
+import AssetManagement.AssetManagement.enums.TicketCategory;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import AssetManagement.AssetManagement.service.TicketService;
 import AssetManagement.AssetManagement.service.UserAssetService;
@@ -119,15 +120,26 @@ public class UserAssetController {
 
         return ResponseEntity.ok(response);
     }
-//    @GetMapping("/tickets")
-//    public ResponseEntity<PaginatedResponse<TicketDTO>> getUserTickets(
-//            @RequestParam(required = false) TicketStatus status,
-//            @RequestParam(defaultValue = "0") int page,
-//            @RequestParam(defaultValue = "10") int size
-//    ) {
-//        PaginatedResponse<TicketDTO> response = ticketService.getUserTickets( status, page, size);
-//        return ResponseEntity.ok(response);
-//    }
+
+    @PutMapping("/tickets/{ticketId}/location/{locationId}")
+    public ResponseEntity<TicketDTO> updateTicketLocation(
+            @PathVariable Long ticketId,
+            @PathVariable Long locationId
+    ) {
+        TicketDTO ticketDTO = ticketService.updateLocation(ticketId, locationId);
+        return ResponseEntity.ok(ticketDTO);
+    }
+
+    @PutMapping("/tickets/{ticketId}/category/{category}")
+    public ResponseEntity<TicketDTO> updateTicketCategory(
+            @PathVariable Long ticketId,
+            @PathVariable TicketCategory category
+    ) {
+        TicketDTO updatedTicket = ticketService.updateCategory(ticketId, category);
+        return ResponseEntity.ok(updatedTicket);
+    }
+
+
 
     @GetMapping("/tickets")
     public ResponseEntity<PaginatedResponse<TicketDTO>> getUserTickets(
@@ -269,6 +281,16 @@ public class UserAssetController {
         TicketDTO savedTicket = ticketService.createTicket(ticketDTO, attachment);
         return ResponseEntity.status(HttpStatus.CREATED).body(savedTicket);
     }
+
+//    @PostMapping(value = "/tickets", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+//    public ResponseEntity<List<TicketDTO>> createBulkTicket(
+//            @RequestPart("ticket") List<Ticket> ticketList,
+//            @RequestPart(value = "attachment", required = false) MultipartFile attachment) {
+//
+//        List<TicketDTO> savedTickets = (List<TicketDTO>) ticketService.createBulkTicket(ticketList, attachment);
+//        return ResponseEntity.status(HttpStatus.CREATED).body(savedTickets);
+//    }
+
 
 
     @PutMapping("/tickets/{ticketId}/assign/{assigneeId}")

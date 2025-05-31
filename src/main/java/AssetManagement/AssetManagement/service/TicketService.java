@@ -21,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -68,7 +69,6 @@ public class TicketService {
     }
 
 
-
     @Transactional
     public TicketDTO createTicket(TicketDTO ticketDTO, MultipartFile attachment) {
         Ticket ticket = new Ticket();
@@ -84,7 +84,13 @@ public class TicketService {
             String deptName = category.name();
             System.out.println("Setting department from category: " + deptName);
             ticket.setTicketDepartment(TicketDepartment.valueOf(deptName));
-        } else {
+        }
+//        if (category == TicketCategory.CCTV || category == TicketCategory.UPS) {
+//            String deptName = category.name();
+//            System.out.println("Setting department from category: " + deptName);
+//            ticket.setTicketDepartment(TicketDepartment.valueOf(deptName));
+//        }
+        else {
             System.out.println("Setting department from DTO: " + ticketDTO.getTicketDepartment());
             ticket.setTicketDepartment(ticketDTO.getTicketDepartment());
         }
@@ -151,6 +157,21 @@ public class TicketService {
         return convertTicketToDTO(savedTicket);
     }
 
+    public ResponseEntity<List<TicketDTO>> createBulkTicket(List<Ticket> ticketList, MultipartFile attachment) {
+        // Save all tickets
+        List<Ticket> savedTickets = ticketRepository.saveAll(ticketList);
+
+        // Optionally handle attachment here for each ticket or store globally (e.g., save to S3, DB, etc.)
+
+        // Convert to DTOs
+        List<TicketDTO> ticketDTOs = savedTickets.stream()
+                .map(ticketMapper::toDTO)
+                .collect(Collectors.toList());
+
+        return new ResponseEntity<>(ticketDTOs, HttpStatus.CREATED);
+    }
+
+
 
     public TicketDTO getTicketById(Long id) {
         Ticket ticket = ticketRepository.findById(id)
@@ -203,6 +224,61 @@ public class TicketService {
         return ticketRepository.findAll(spec, pageable)
                 .map(this::convertTicketToDTO);
     }
+
+    public TicketDTO updateLocation(Long ticketId, Long locationId) {
+        User updater = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(()->new UserNotFoundException("Authenticated User not found"));
+
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new EntityNotFoundException("Ticket not found"));
+
+        Location location = locationRepository.findById(locationId)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found"));
+
+        String oldLocation = ticket.getLocation() != null ? ticket.getLocation().getName() : null;
+
+        ticket.setLocation(location);
+        Ticket savedTicket = ticketRepository.save(ticket);
+
+        TicketMessage message = new TicketMessage();
+        message.setTicket(savedTicket);
+        message.setSender(updater); // The user updating the status
+        message.setMessage("Ticket Location changed from " + oldLocation + " to " + savedTicket.getLocation().getName());
+        message.setSentAt(LocalDateTime.now());
+        message.setStatusUpdatedBy(updater);
+        message.setTicketMessageType(TicketMessageType.PUBLIC_RESPONSE);
+
+        ticketMessageRepository.save(message);
+
+        return convertTicketToDTO(savedTicket);
+    }
+
+    public TicketDTO updateCategory(Long ticketId, TicketCategory category) {
+        User updater = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(()->new UserNotFoundException("Authenticated User not found"));
+
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new EntityNotFoundException("Ticket not found"));
+
+        String oldCategory = ticket.getCategory() != null ? ticket.getCategory().name() : null;
+
+        ticket.setCategory(category);
+        Ticket savedTicket = ticketRepository.save(ticket);
+
+        TicketMessage message = new TicketMessage();
+        message.setTicket(savedTicket);
+        message.setSender(updater); // The user updating the status
+        message.setMessage("Ticket Category changed from " + oldCategory + " to " + savedTicket.getCategory().name());
+        message.setSentAt(LocalDateTime.now());
+        message.setStatusUpdatedBy(updater);
+        message.setTicketMessageType(TicketMessageType.PUBLIC_RESPONSE);
+
+        ticketMessageRepository.save(message);
+
+        return convertTicketToDTO(savedTicket);
+    }
+
+
 
 
     public PaginatedResponse<TicketDTO> getAllTicketsForAdmin(int page, int size, TicketStatus status) {
@@ -318,7 +394,7 @@ public class TicketService {
         // modify the rule of send mail to internal
         if(savedMessage.getTicketMessageType()== TicketMessageType.INTERNAL_NOTE){
             emailTicketService.sendInternalMail(senderUser.getEmail(),savedMessage.getMessage()
-            ,ticket.getCcEmails());
+            ,ticket.getCcEmails(),ticket);
 
         }else {
             emailTicketService.sendAcknowledgmentReplyToTicket
@@ -378,6 +454,7 @@ public class TicketService {
         message.setMessage("Employee changed from " + oldEmployee + " to " + newEmployeeId);
         message.setSentAt(LocalDateTime.now());
         message.setStatusUpdatedBy(updater);
+        message.setTicketMessageType(TicketMessageType.PUBLIC_RESPONSE);
 
         ticketMessageRepository.save(message);
 
@@ -623,7 +700,6 @@ public class TicketService {
 //                end >= combinedTickets.size()
 //        );
 //    }
-//
 
     public PaginatedResponse<TicketDTO> getUserTickets(TicketStatus status, String employeeId, int page, int size) {
         User user;

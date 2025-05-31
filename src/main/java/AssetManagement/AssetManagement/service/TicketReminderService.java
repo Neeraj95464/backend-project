@@ -35,7 +35,7 @@ public class TicketReminderService {
         this.locationAssignmentRepository = locationAssignmentRepository;
         this.emailService = emailService;
     }
-    @Scheduled(cron = "0 0 9 * * *") // Runs daily at 9 AM
+    @Scheduled(cron = "0 0 9 * * *") // Runs daily at 9 AM for 7 days old tickets
     public void sendReminderForOldTickets() {
         LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
         List<Ticket> oldOpenTickets = ticketRepository.findOpenTicketsOlderThan(sevenDaysAgo);
@@ -55,6 +55,10 @@ public class TicketReminderService {
                 ticketsByManager.computeIfAbsent(manager, k -> new ArrayList<>()).add(ticket);
             }
         }
+        List<String> ccEmails = List.of(
+                "ithead@mahavirgroup.co",
+                "it.jubileehills@mahavirauto.co"
+        );
 
         // Send grouped emails to each manager
         for (Map.Entry<User, List<Ticket>> entry : ticketsByManager.entrySet()) {
@@ -64,7 +68,7 @@ public class TicketReminderService {
             String emailBody = buildEmailBody(manager, tickets);
             String subject = "Reminder: Open Tickets Over 7 Days for Your Department";
 
-            emailService.sendEmailViaGraph(manager.getEmail(), subject, emailBody, null);
+            emailService.sendEmailViaGraph(manager.getEmail(), subject, emailBody, ccEmails);
         }
     }
 
@@ -107,7 +111,8 @@ public class TicketReminderService {
                 "it.manager@mahavirgroup.co",
                 "it.manager@mahavirmotors.com",
                 "it@benelli-india.com",
-                "it.kochi@coastalstar.in"
+                "it.kochi@coastalstar.in",
+                "it.jubileehills@mahavirauto.co"
         );
 
         if (!oldTickets.isEmpty()) {
@@ -152,7 +157,8 @@ public class TicketReminderService {
                 "it.manager@mahavirgroup.co",
                 "it.manager@mahavirmotors.com",
                 "it@benelli-india.com",
-                "it.kochi@coastalstar.in"
+                "it.kochi@coastalstar.in",
+                "it.jubileehills@mahavirauto.co"
         );
 
         List<String> ccEmail = List.of(

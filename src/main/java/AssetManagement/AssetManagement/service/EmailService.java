@@ -380,7 +380,7 @@ public class EmailService {
     }
 
 
-    public void sendInternalMail(String senderEmail, String messagePreview, List<String> ccEmails) {
+    public void sendInternalMail(String senderEmail, String messagePreview, List<String> ccEmails,Ticket ticket) {
         // Build TO recipient (sender)
         Recipient toRecipient = new Recipient();
         EmailAddress senderAddress = new EmailAddress();
@@ -404,7 +404,7 @@ public class EmailService {
         <html>
             <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
                 <div style="max-width: 600px; margin: auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
-                    <h2 style="color: #004aad;">📩 Ticket Update</h2>
+                    <h2 style="color: #004aad;">📩 Internal Note Added in Ticket </h2>
                     <p style="font-size: 16px; color: #333333;">
                         %s
                     </p>
@@ -419,7 +419,8 @@ public class EmailService {
 
         // Create and send message
         Message message = new Message();
-        message.subject = "Ticket Notification";  // You can hardcode or make dynamic
+//        message.subject = "Ticket Notification";  // You can hardcode or make dynamic
+         message.subject = "Re: Ticket ID: " + ticket.getId() + " - " + ticket.getTitle();
         ItemBody body = new ItemBody();
         body.contentType = BodyType.HTML;
         body.content = bodyHtml;
