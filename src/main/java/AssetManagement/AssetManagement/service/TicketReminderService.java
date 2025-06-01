@@ -68,7 +68,7 @@ public class TicketReminderService {
             String emailBody = buildEmailBody(manager, tickets);
             String subject = "Reminder: Open Tickets Over 7 Days for Your Department";
 
-            emailService.sendEmailViaGraph(manager.getEmail(), subject, emailBody, ccEmails);
+            emailService.sendEmailViaGraph(manager.getEmail(), subject, emailBody, null);
         }
     }
 
@@ -79,7 +79,8 @@ public class TicketReminderService {
         html.append("<h3>Dear ").append(manager.getUsername()).append(",</h3>");
         html.append("<p>The following tickets are open for more than 7 days:</p>");
         html.append("<table border='1' cellpadding='5' cellspacing='0'>")
-                .append("<tr><th>Ticket ID</th><th>Title</th><th>Created At</th><th>Department</th><th>Location</th><th>Employee</th></tr>");
+                .append("<tr><th>Ticket ID</th><th>Title</th><th>Created At</th><th>Department</th><th>Location</th><th>Employee</th>" +
+                        "<th>Assignee</th></tr>");
 
         for (Ticket t : tickets) {
             html.append("<tr>")

@@ -35,8 +35,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -907,20 +906,51 @@ public class TicketService {
     }
 
     public Map<String, Long> getTicketsCreatedPerDay() {
-        List<Ticket> tickets = ticketRepository.findAll();
         Map<String, Long> stats = new TreeMap<>();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+        ZoneId zone = ZoneId.of("Asia/Kolkata");
+        LocalDate today = LocalDate.now(zone);
+        LocalDate startDate = today.minusDays(29);
+        LocalDateTime startOfDay = startDate.atStartOfDay();
+        LocalDateTime endOfToday = today.atTime(LocalTime.MAX);
+
+        // Pre-fill with zeros for all 30 days
+        for (int i = 0; i < 30; i++) {
+            String date = startDate.plusDays(i).format(formatter);
+            stats.put(date, 0L);
+        }
+
+        List<Ticket> tickets = ticketRepository.findTicketsCreatedBetween(startOfDay, endOfToday);
+
         for (Ticket ticket : tickets) {
-            String date = ticket.getCreatedAt().format(formatter);
-            stats.put(date, stats.getOrDefault(date, 0L) + 1);
+            if (ticket.getCreatedAt() != null) {
+                String date = ticket.getCreatedAt()
+                        .atZone(ZoneId.systemDefault())
+                        .withZoneSameInstant(zone)
+                        .toLocalDate()
+                        .format(formatter);
+                stats.put(date, stats.get(date) + 1);
+            }
         }
 
         return stats;
     }
 
+
+
+
+
+
     public Map<String, Long> getTicketCountByCategory() {
-        List<Ticket> tickets = ticketRepository.findAll();
+        ZoneId zone = ZoneId.of("Asia/Kolkata");
+        LocalDate today = LocalDate.now(zone);
+        LocalDate startDate = today.minusDays(29);
+        LocalDateTime startOfDay = startDate.atStartOfDay();
+        LocalDateTime endOfToday = today.atTime(LocalTime.MAX);
+
+
+        List<Ticket> tickets = ticketRepository.findTicketsCreatedBetween(startOfDay,endOfToday);
         return tickets.stream()
                 .collect(Collectors.groupingBy(
                         t -> t.getCategory() != null ? t.getCategory().name() : "Uncategorized",
@@ -929,7 +959,13 @@ public class TicketService {
     }
 
     public Map<String, Long> getTicketCountByAssignee() {
-        List<Ticket> tickets = ticketRepository.findAll();
+        ZoneId zone = ZoneId.of("Asia/Kolkata");
+        LocalDate today = LocalDate.now(zone);
+        LocalDate startDate = today.minusDays(29);
+        LocalDateTime startOfDay = startDate.atStartOfDay();
+        LocalDateTime endOfToday = today.atTime(LocalTime.MAX);
+
+        List<Ticket> tickets = ticketRepository.findTicketsCreatedBetween(startOfDay,endOfToday);
         return tickets.stream()
                 .collect(Collectors.groupingBy(
                         t -> t.getAssignee() != null ? t.getAssignee().getUsername() : "Unassigned",
@@ -954,6 +990,24 @@ public class TicketService {
     }
 
 
+//    public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
+//        User user = userRepository.findByEmployeeId(assigneeId)
+//                .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
+//
+//        List<Ticket> tickets = ticketRepository.findByAssignee(user);
+//
+//        List<Long> resolutionTimesInMinutes = tickets.stream()
+//                .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null && t.getStatus() == TicketStatus.CLOSED)
+//                .map(t -> Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
+//                .collect(Collectors.toList());
+//
+//        long avg = (long) resolutionTimesInMinutes.stream().mapToLong(Long::longValue).average().orElse(0);
+//        long min = resolutionTimesInMinutes.stream().mapToLong(Long::longValue).min().orElse(0);
+//        long max = resolutionTimesInMinutes.stream().mapToLong(Long::longValue).max().orElse(0);
+//
+//        return new ResolutionTimeStatsDTO(avg, min, max); // still in minutes
+//    }
+
     public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
         User user = userRepository.findByEmployeeId(assigneeId)
                 .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
@@ -965,43 +1019,120 @@ public class TicketService {
                 .map(t -> Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
                 .collect(Collectors.toList());
 
+        if (resolutionTimesInMinutes.isEmpty()) {
+            return new ResolutionTimeStatsDTO(null, null, null); // or use -1 for all if nulls are not acceptable
+        }
+
         long avg = (long) resolutionTimesInMinutes.stream().mapToLong(Long::longValue).average().orElse(0);
         long min = resolutionTimesInMinutes.stream().mapToLong(Long::longValue).min().orElse(0);
         long max = resolutionTimesInMinutes.stream().mapToLong(Long::longValue).max().orElse(0);
 
-        return new ResolutionTimeStatsDTO(avg, min, max); // still in minutes
+        return new ResolutionTimeStatsDTO(avg, min, max);
     }
 
 
-    public List<TicketStatusTimeSeriesDTO> getTicketStatusOverTime() {
 
-        List<Ticket> tickets = ticketRepository.findAll();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        Map<String, Map<TicketStatus, Long>> dailyStatusMap = new TreeMap<>();
+//    public List<TicketStatusTimeSeriesDTO> getTicketStatusOverTime() {
+//
+//        List<Ticket> tickets = ticketRepository.findAll();
+//        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+//        Map<String, Map<TicketStatus, Long>> dailyStatusMap = new TreeMap<>();
+//
+//        for (Ticket ticket : tickets) {
+//            if (ticket.getCreatedAt() != null && ticket.getStatus() != null) {
+//                String date = ticket.getCreatedAt().format(formatter);
+//                dailyStatusMap.putIfAbsent(date, new EnumMap<>(TicketStatus.class));
+//                Map<TicketStatus, Long> statusMap = dailyStatusMap.get(date);
+//                statusMap.put(ticket.getStatus(), statusMap.getOrDefault(ticket.getStatus(), 0L) + 1);
+//            }
+//        }
+//
+//        List<TicketStatusTimeSeriesDTO> series = new ArrayList<>();
+//        for (Map.Entry<String, Map<TicketStatus, Long>> entry : dailyStatusMap.entrySet()) {
+//            series.add(new TicketStatusTimeSeriesDTO(entry.getKey(), entry.getValue()));
+//        }
+//
+//        return series;
+//    }
 
-        for (Ticket ticket : tickets) {
-            if (ticket.getCreatedAt() != null && ticket.getStatus() != null) {
-                String date = ticket.getCreatedAt().format(formatter);
-                dailyStatusMap.putIfAbsent(date, new EnumMap<>(TicketStatus.class));
-                Map<TicketStatus, Long> statusMap = dailyStatusMap.get(date);
-                statusMap.put(ticket.getStatus(), statusMap.getOrDefault(ticket.getStatus(), 0L) + 1);
-            }
-        }
-
-        List<TicketStatusTimeSeriesDTO> series = new ArrayList<>();
-        for (Map.Entry<String, Map<TicketStatus, Long>> entry : dailyStatusMap.entrySet()) {
-            series.add(new TicketStatusTimeSeriesDTO(entry.getKey(), entry.getValue()));
-        }
-
-        return series;
-    }
+//    public Map<String, Long> getTopTicketReporters() {
+//        ZoneId zone = ZoneId.of("Asia/Kolkata");
+//        LocalDate today = LocalDate.now(zone);
+//        LocalDate startDate = today.minusDays(29);
+//        LocalDateTime startOfDay = startDate.atStartOfDay();
+//        LocalDateTime endOfToday = today.atTime(LocalTime.MAX);
+//
+//        List<Ticket> tickets = ticketRepository.findTicketsCreatedBetween(startOfDay,endOfToday);
+//        return tickets.stream()
+//                .collect(Collectors.groupingBy(
+//                        t -> t.getEmployee() != null ? t.getEmployee().getUsername() : "Unknown",
+//                        Collectors.counting()
+//                ));
+//    }
 
     public Map<String, Long> getTopTicketReporters() {
-        List<Ticket> tickets = ticketRepository.findAll();
+        ZoneId zone = ZoneId.of("Asia/Kolkata");
+        LocalDate today = LocalDate.now(zone);
+        LocalDate startDate = today.minusDays(29);
+        LocalDateTime startOfDay = startDate.atStartOfDay();
+        LocalDateTime endOfToday = today.atTime(LocalTime.MAX);
+
+        // Get all tickets from the past 30 days
+        List<Ticket> tickets = ticketRepository.findTicketsCreatedBetween(startOfDay, endOfToday);
+
+        // Fetch all users who are IT Executives from LocationAssignment
+        List<User> itExecutives = locationAssignmentRepository.findAll().stream()
+                .map(LocationAssignment::getItExecutive)
+                .distinct()
+                .toList();
+
+        Set<Long> itExecutiveIds = itExecutives.stream()
+                .map(User::getId)
+                .collect(Collectors.toSet());
+
+        // Group and count tickets by employee, excluding IT executives
         return tickets.stream()
+                .filter(t -> t.getEmployee() != null && !itExecutiveIds.contains(t.getEmployee().getId()))
                 .collect(Collectors.groupingBy(
-                        t -> t.getEmployee() != null ? t.getEmployee().getUsername() : "Unknown",
+                        t -> t.getEmployee().getUsername(),
                         Collectors.counting()
                 ));
     }
+
+    public Map<String, Long> getTicketCountByLocation() {
+        ZoneId zone = ZoneId.of("Asia/Kolkata");
+        LocalDate today = LocalDate.now(zone);
+        LocalDate startDate = today.minusDays(29);
+        LocalDateTime startOfDay = startDate.atStartOfDay();
+        LocalDateTime endOfToday = today.atTime(LocalTime.MAX);
+
+        return ticketRepository.findTicketsCreatedBetween(startOfDay,endOfToday).stream()
+                .filter(t -> t.getLocation() != null)
+                .collect(Collectors.groupingBy(t -> t.getLocation().getName(), Collectors.counting()));
+    }
+
+//    public List<Ticket> getOverdueTickets() {
+//        ZoneId zone = ZoneId.of("Asia/Kolkata");
+//        LocalDate today = LocalDate.now(zone);
+//        LocalDate startDate = today.minusDays(29); // last 30 days
+//        LocalDateTime startOfDay = startDate.atStartOfDay();
+//        LocalDateTime endOfToday = today.atTime(LocalTime.MAX);
+//        LocalDateTime now = LocalDateTime.now(zone);
+//
+//        List<Ticket> tickets = ticketRepository.findTicketsCreatedBetween(startOfDay, endOfToday);
+//
+//        List<Ticket> filtered = tickets.stream()
+//                .filter(t -> t.getDueDate() != null &&
+//                        t.getDueDate().isBefore(now) &&
+//                        (t.getStatus() == TicketStatus.OPEN || t.getStatus() == TicketStatus.WAITING))
+//                .toList();
+//
+//        System.out.println("Total found: " + filtered.size());
+//        filtered.forEach(t -> System.out.println("Ticket: " + t.getId() + ", Due: " + t.getDueDate() + ", Status: " + t.getStatus()));
+//
+//        return filtered;
+//    }
+
+
+
 }

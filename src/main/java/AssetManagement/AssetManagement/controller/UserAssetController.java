@@ -375,7 +375,7 @@ public class UserAssetController {
     @GetMapping("/tickets/stats/created-per-day")
     public ResponseEntity<Map<String, Long>> getTicketsCreatedPerDay() {
 
-        Map<String, Long> stats = ticketService.getTicketsCreatedPerDay(); // Format date as yyyy-MM-dd
+        Map<String, Long> stats = ticketService.getTicketsCreatedPerDay();
         return ResponseEntity.ok(stats);
     }
 
@@ -400,7 +400,10 @@ public class UserAssetController {
 
     @GetMapping("/tickets/stats/resolution/assignee/{employeeId}")
     public ResolutionTimeStatsDTO getResolutionStatsByAssignee(@PathVariable String employeeId) {
-        return ticketService.getAssigneeResolutionStats(employeeId);
+        System.out.println("Request came with employee id "+employeeId);
+        ResolutionTimeStatsDTO stats = ticketService.getAssigneeResolutionStats(employeeId);
+        System.out.println("stats is "+ stats);
+        return stats;
     }
 
     @GetMapping("/tickets/stats/top-reporters")
@@ -408,10 +411,13 @@ public class UserAssetController {
         Map<String, Long> reporters = ticketService.getTopTicketReporters();
         return ResponseEntity.ok(reporters);
     }
-    @GetMapping("/tickets/stats/status-over-time")
-    public ResponseEntity<List<TicketStatusTimeSeriesDTO>> getTicketStatusOverTime() {
-        List<TicketStatusTimeSeriesDTO> data = ticketService.getTicketStatusOverTime();
-        return ResponseEntity.ok(data);
+
+    @GetMapping("/tickets/stats/by-location")
+    public ResponseEntity<Map<String, Long>> getTicketCountByLocation() {
+        return ResponseEntity.ok(ticketService.getTicketCountByLocation());
     }
+
+
+
 
 }

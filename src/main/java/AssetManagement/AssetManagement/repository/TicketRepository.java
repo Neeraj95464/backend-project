@@ -15,6 +15,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -48,6 +49,10 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
 
     @Query("SELECT t FROM Ticket t WHERE t.status = 'OPEN' AND t.createdAt <= :sevenDaysAgo")
     List<Ticket> findOpenTicketsOlderThan(@Param("sevenDaysAgo") LocalDateTime sevenDaysAgo);
+
+
+    @Query("SELECT t FROM Ticket t WHERE t.createdAt BETWEEN :start AND :end")
+    List<Ticket> findTicketsCreatedBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
 }
 
