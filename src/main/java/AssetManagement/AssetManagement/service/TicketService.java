@@ -278,8 +278,6 @@ public class TicketService {
     }
 
 
-
-
     public PaginatedResponse<TicketDTO> getAllTicketsForAdmin(int page, int size, TicketStatus status) {
         // Ensure only admin users can access this data
         String role = SecurityContextHolder.getContext().getAuthentication().getAuthorities().toString();
@@ -293,8 +291,15 @@ public class TicketService {
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         if (status != null) {
-            // Fetch tickets based on status
-            ticketPage = ticketRepository.findByStatus(status, pageRequest);
+
+            if ("ALL".equalsIgnoreCase(String.valueOf(status))) {
+                // Fetch all tickets without filtering by status
+                ticketPage = ticketRepository.findAll(pageRequest);
+            } else {
+                // Fetch tickets filtered by the specified status
+                ticketPage = ticketRepository.findByStatus(status, pageRequest);
+            }
+
         } else {
             // Fetch all tickets
             ticketPage = ticketRepository.findAll(pageRequest);
@@ -613,7 +618,6 @@ public class TicketService {
 
 
 
-
     public TicketDTO updateTicketStatus(Long ticketId, TicketStatus newStatus) {
         String updatedByEmployeeId = AuthUtils.getAuthenticatedUsername();
         Ticket ticket = ticketRepository.findById(ticketId)
@@ -641,15 +645,14 @@ public class TicketService {
 
         ticketMessageRepository.save(message);
 
-
         if (!savedTicket.getAssignee().equals(savedTicket.getEmployee())) {
             String toEmail = ticket.getEmployee().getEmail();
-            String subject = "Your Ticket #" + ticket.getId() + " Has Been Closed – Please Rate Us";
+            String subject = "Ticket ID: " + ticket.getId() + " - " +
+                    (savedTicket.getTitle() != null ? savedTicket.getTitle() : ticket.getTitle());
             String feedbackHtml = generateFeedbackEmailHtml(ticket.getId());
 
             emailTicketService.sendEmailViaGraph(toEmail, subject, feedbackHtml, null);
         }
-
 
         return convertTicketToDTO(ticket);
     }
@@ -803,16 +806,28 @@ public class TicketService {
         return tickets.stream().map(this::convertTicketToDTO).collect(Collectors.toList());
     }
 
+//    public List<UserIdNameDTO> getAllUserIdAndNames() {
+//        return locationAssignmentRepository.findAll()
+//                .stream()
+//                .map(la -> new UserIdNameDTO(
+//                        la.getItExecutive().getEmployeeId(), // Use employeeId instead of ID
+//                        la.getItExecutive().getUsername()
+//                ))
+//                .distinct()
+//                .collect(Collectors.toList());
+//    }
+
     public List<UserIdNameDTO> getAllUserIdAndNames() {
         return locationAssignmentRepository.findAll()
                 .stream()
-                .map(la -> new UserIdNameDTO(
-                        la.getItExecutive().getEmployeeId(), // Use employeeId instead of ID
-                        la.getItExecutive().getUsername()
+                .flatMap(la -> Stream.of(
+                        new UserIdNameDTO(la.getItExecutive().getEmployeeId(), la.getItExecutive().getUsername()),
+                        new UserIdNameDTO(la.getLocationManager().getEmployeeId(), la.getLocationManager().getUsername())
                 ))
-                .distinct()
+                .distinct() // This will eliminate duplicate users based on equals/hashCode in DTO
                 .collect(Collectors.toList());
     }
+
 
 
     private TicketDTO convertTicketToDTO(Ticket ticket) {
@@ -1070,6 +1085,35 @@ public class TicketService {
 //                ));
 //    }
 
+//    public Map<String, Long> getTopTicketReporters() {
+//        ZoneId zone = ZoneId.of("Asia/Kolkata");
+//        LocalDate today = LocalDate.now(zone);
+//        LocalDate startDate = today.minusDays(29);
+//        LocalDateTime startOfDay = startDate.atStartOfDay();
+//        LocalDateTime endOfToday = today.atTime(LocalTime.MAX);
+//
+//        // Get all tickets from the past 30 days
+//        List<Ticket> tickets = ticketRepository.findTicketsCreatedBetween(startOfDay, endOfToday);
+//
+//        // Fetch all users who are IT Executives from LocationAssignment
+//        List<User> itExecutives = locationAssignmentRepository.findAll().stream()
+//                .map(LocationAssignment::getItExecutive)
+//                .distinct()
+//                .toList();
+//
+//        Set<Long> itExecutiveIds = itExecutives.stream()
+//                .map(User::getId)
+//                .collect(Collectors.toSet());
+//
+//        // Group and count tickets by employee, excluding IT executives
+//        return tickets.stream()
+//                .filter(t -> t.getEmployee() != null && !itExecutiveIds.contains(t.getEmployee().getId()))
+//                .collect(Collectors.groupingBy(
+//                        t -> t.getEmployee().getUsername(),
+//                        Collectors.counting()
+//                ));
+//    }
+
     public Map<String, Long> getTopTicketReporters() {
         ZoneId zone = ZoneId.of("Asia/Kolkata");
         LocalDate today = LocalDate.now(zone);
@@ -1091,13 +1135,25 @@ public class TicketService {
                 .collect(Collectors.toSet());
 
         // Group and count tickets by employee, excluding IT executives
-        return tickets.stream()
+        Map<String, Long> reporterCounts = tickets.stream()
                 .filter(t -> t.getEmployee() != null && !itExecutiveIds.contains(t.getEmployee().getId()))
                 .collect(Collectors.groupingBy(
                         t -> t.getEmployee().getUsername(),
                         Collectors.counting()
                 ));
+
+        // Sort by count descending and limit to top 15
+        return reporterCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue(Comparator.reverseOrder()))
+                .limit(15)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (e1, e2) -> e1,
+                        LinkedHashMap::new // maintain order
+                ));
     }
+
 
     public Map<String, Long> getTicketCountByLocation() {
         ZoneId zone = ZoneId.of("Asia/Kolkata");

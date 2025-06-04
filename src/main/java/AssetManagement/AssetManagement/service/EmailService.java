@@ -5,6 +5,7 @@ import AssetManagement.AssetManagement.entity.Ticket;
 import AssetManagement.AssetManagement.entity.TicketMessage;
 import AssetManagement.AssetManagement.entity.User;
 import AssetManagement.AssetManagement.enums.TicketCategory;
+import AssetManagement.AssetManagement.enums.TicketDepartment;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import AssetManagement.AssetManagement.exception.UserNotFoundException;
 import AssetManagement.AssetManagement.mapper.TicketMapper;
@@ -209,6 +210,7 @@ public class EmailService {
         ticket.setTitle(emailSubject);
         ticket.setDescription(emailBody);
         ticket.setCategory(TicketCategory.OTHER);
+        ticket.setTicketDepartment(TicketDepartment.IT);
 //        ticket.setStatus(TicketStatus.OPEN);
 
         System.out.println("Sender email: " + senderEmail);
@@ -495,14 +497,14 @@ public class EmailService {
 
                     // when no one is assignee (might be ticket created by mail so after followup maill
                     // will go on this email only
-                    recipientEmail = "neerajcmb@gmail.com";
+                    recipientEmail = "it.manager@mahavirgroup.co";
                 }
             } else if (ticket.getAssignee() != null && sender.getId().equals(ticket.getAssignee().getId())) {
                 // Assignee is replying
                 recipientEmail = ticket.getEmployee().getEmail();
                 ccSet.add(ticket.getAssignee().getEmail());  // add assignee to CC
             } else {
-                recipientEmail = "kumarneerajkumar1781@gmail.com";
+                recipientEmail = "it.manager@mahavirgroup.co";
             }
 
             // Add previously stored CC emails
