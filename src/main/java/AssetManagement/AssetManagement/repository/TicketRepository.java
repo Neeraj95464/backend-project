@@ -4,6 +4,7 @@ import AssetManagement.AssetManagement.enums.TicketCategory;
 import AssetManagement.AssetManagement.entity.Location;
 import AssetManagement.AssetManagement.entity.Ticket;
 import AssetManagement.AssetManagement.entity.User;
+import AssetManagement.AssetManagement.enums.TicketDepartment;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -53,6 +54,11 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
 
     @Query("SELECT t FROM Ticket t WHERE t.createdAt BETWEEN :start AND :end")
     List<Ticket> findTicketsCreatedBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    Page<Ticket> findByTicketDepartment(TicketDepartment ticketDepartment, Pageable pageable);
+
+    Page<Ticket> findByTicketDepartmentAndStatus(TicketDepartment ticketDepartment, TicketStatus status, Pageable pageable);
+
 
 }
 

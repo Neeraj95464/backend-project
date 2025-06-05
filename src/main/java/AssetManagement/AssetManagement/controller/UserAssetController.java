@@ -150,6 +150,7 @@ public class UserAssetController {
     ) {
         System.out.println("Request came with employee id to fetch tickets "+employeeId);
         PaginatedResponse<TicketDTO> response = ticketService.getUserTickets(status, employeeId, page, size);
+//        System.out.println(response);
         return ResponseEntity.ok(response);
     }
 
@@ -193,9 +194,9 @@ public class UserAssetController {
                 row.createCell(2).setCellValue(dto.getDescription());
                 row.createCell(3).setCellValue(dto.getCategory() != null ? dto.getCategory().name() : "");
                 row.createCell(4).setCellValue(dto.getStatus() != null ? dto.getStatus().name() : "");
-                row.createCell(5).setCellValue(dto.getEmployee());
+                row.createCell(5).setCellValue(dto.getEmployee().getUsername());
                 row.createCell(6).setCellValue(dto.getCreatedBy());
-                row.createCell(7).setCellValue(dto.getAssignee());
+                row.createCell(7).setCellValue(dto.getAssignee().getUsername());
                 row.createCell(8).setCellValue(dto.getAssetTag());
                 row.createCell(9).setCellValue(dto.getAssetName());
                 row.createCell(10).setCellValue(dto.getLocationName());

@@ -6,6 +6,7 @@ import AssetManagement.AssetManagement.entity.Ticket;
 import AssetManagement.AssetManagement.entity.TicketMessage;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import AssetManagement.AssetManagement.repository.TicketMessageRepository;
+import AssetManagement.AssetManagement.service.UserService;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -17,9 +18,11 @@ import java.util.stream.Stream;
 @Component
 public class TicketMapper {
     private final TicketMessageRepository ticketMessageRepository;
+    private final UserService userService;
 
-    public TicketMapper(TicketMessageRepository ticketMessageRepository) {
+    public TicketMapper(TicketMessageRepository ticketMessageRepository, UserService userService) {
         this.ticketMessageRepository = ticketMessageRepository;
+        this.userService = userService;
     }
 
 //    public TicketDTO toDTO(Ticket ticket) {
@@ -88,9 +91,9 @@ public class TicketMapper {
                 ticket.getDescription(),
                 ticket.getCategory(),
                 ticket.getStatus(),
-                ticket.getEmployee() != null ? ticket.getEmployee().getUsername() : null,
+                ticket.getEmployee() != null ? userService.convertUserToDto(ticket.getEmployee()) : null,
                 ticket.getCreatedBy(),
-                ticket.getAssignee() != null ? ticket.getAssignee().getUsername() : null,
+                ticket.getAssignee() != null ? userService.convertUserToDto(ticket.getAssignee()) : null,
                 ticket.getAsset() != null ? ticket.getAsset().getAssetTag() : null,
                 ticket.getAsset() != null ? ticket.getAsset().getName() : "Other",
                 ticket.getLocation() != null ? ticket.getLocation().getName() : null,

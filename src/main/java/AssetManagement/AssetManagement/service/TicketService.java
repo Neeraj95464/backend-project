@@ -2,10 +2,7 @@ package AssetManagement.AssetManagement.service;
 
 import AssetManagement.AssetManagement.dto.*;
 import AssetManagement.AssetManagement.entity.*;
-import AssetManagement.AssetManagement.enums.TicketCategory;
-import AssetManagement.AssetManagement.enums.TicketDepartment;
-import AssetManagement.AssetManagement.enums.TicketMessageType;
-import AssetManagement.AssetManagement.enums.TicketStatus;
+import AssetManagement.AssetManagement.enums.*;
 import AssetManagement.AssetManagement.exception.UserNotFoundException;
 import AssetManagement.AssetManagement.mapper.TicketMapper;
 import AssetManagement.AssetManagement.repository.*;
@@ -48,6 +45,7 @@ public class TicketService {
     private final TicketRepository ticketRepository;
     private final TicketMessageRepository ticketMessageRepository;
     private final UserRepository userRepository;
+    private final UserService userService;
     private final TicketFeedbackRepository ticketFeedbackRepository;
     private final AssetRepository assetRepository;
     private final LocationAssignmentRepository locationAssignmentRepository;
@@ -55,10 +53,11 @@ public class TicketService {
     private final LocationRepository locationRepository;
     private final EmailService emailTicketService;
 
-    public TicketService(TicketRepository ticketRepository, TicketMessageRepository ticketMessageRepository, UserRepository userRepository, TicketFeedbackRepository ticketFeedbackRepository, AssetRepository assetRepository, LocationAssignmentRepository locationAssignmentRepository, TicketMapper ticketMapper, LocationRepository locationRepository, EmailService emailTicketService, EmailService emailTicketService1) {
+    public TicketService(TicketRepository ticketRepository, TicketMessageRepository ticketMessageRepository, UserRepository userRepository, UserService userService, TicketFeedbackRepository ticketFeedbackRepository, AssetRepository assetRepository, LocationAssignmentRepository locationAssignmentRepository, TicketMapper ticketMapper, LocationRepository locationRepository, EmailService emailTicketService, EmailService emailTicketService1) {
         this.ticketRepository = ticketRepository;
         this.ticketMessageRepository = ticketMessageRepository;
         this.userRepository = userRepository;
+        this.userService = userService;
         this.ticketFeedbackRepository = ticketFeedbackRepository;
         this.assetRepository = assetRepository;
         this.locationAssignmentRepository = locationAssignmentRepository;
@@ -100,7 +99,7 @@ public class TicketService {
 
         ticket.setLocation(location);
 
-        User employeeUser = userRepository.findByEmployeeId(ticketDTO.getEmployee())
+        User employeeUser = userRepository.findByEmployeeId(ticketDTO.getEmployee().getEmployeeId())
                 .orElseThrow(() -> new EntityNotFoundException("Employee not found"));
         ticket.setEmployee(employeeUser);
 
@@ -278,38 +277,84 @@ public class TicketService {
     }
 
 
+//    public PaginatedResponse<TicketDTO> getAllTicketsForAdmin(int page, int size, TicketStatus status) {
+//        // Ensure only admin users can access this data
+////        String role = SecurityContextHolder.getContext().getAuthentication().getAuthorities().toString();
+//        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+//                .orElseThrow(() -> new UserNotFoundException("Authenticated User not found "));
+//        String role = user.getRole();
+//        TicketDepartment userDepartment = TicketDepartment.valueOf(user.getDepartment().name());
+//
+//        if (!role.contains("ADMIN")) {
+//            throw new RuntimeException("Access Denied: Only admins can view all tickets.");
+//        }
+//
+//        Page<Ticket> ticketPage;
+//
+//        // Create PageRequest with sorting by createdAt in descending order
+//        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+//
+//        if (status != null) {
+//
+//            if ("ALL".equalsIgnoreCase(String.valueOf(status))) {
+//                // Fetch all tickets without filtering by status
+//                ticketPage = ticketRepository.findAll(pageRequest);
+//            } else {
+//                // Fetch tickets filtered by the specified status
+//                ticketPage = ticketRepository.findByStatus(status, pageRequest);
+//            }
+//
+//        } else {
+//            // Fetch all tickets
+//            ticketPage = ticketRepository.findAll(pageRequest);
+//        }
+//
+//        List<TicketDTO> ticketDTOs = ticketPage.getContent().stream()
+//                .map(ticketMapper::toDTO)
+//                .collect(Collectors.toList());
+//
+//        // Return a paginated response
+//        return new PaginatedResponse<>(
+//                ticketDTOs,
+//                ticketPage.getNumber(),
+//                ticketPage.getSize(),
+//                ticketPage.getTotalElements(),
+//                ticketPage.getTotalPages(),
+//                ticketPage.isLast()
+//        );
+//    }
+
+
     public PaginatedResponse<TicketDTO> getAllTicketsForAdmin(int page, int size, TicketStatus status) {
-        // Ensure only admin users can access this data
-        String role = SecurityContextHolder.getContext().getAuthentication().getAuthorities().toString();
-        if (!role.contains("ADMIN")) {
+        // Fetch the authenticated user
+        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(() -> new UserNotFoundException("Authenticated User not found"));
+
+        String role = user.getRole();
+        if (!role.equalsIgnoreCase("ADMIN")) {
             throw new RuntimeException("Access Denied: Only admins can view all tickets.");
         }
 
-        Page<Ticket> ticketPage;
+        TicketDepartment userDepartment = TicketDepartment.valueOf(user.getDepartment().name()); // Assuming Department is an enum
 
-        // Create PageRequest with sorting by createdAt in descending order
+        // Define page request sorted by createdAt in descending order
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        if (status != null) {
+        Page<Ticket> ticketPage;
 
-            if ("ALL".equalsIgnoreCase(String.valueOf(status))) {
-                // Fetch all tickets without filtering by status
-                ticketPage = ticketRepository.findAll(pageRequest);
-            } else {
-                // Fetch tickets filtered by the specified status
-                ticketPage = ticketRepository.findByStatus(status, pageRequest);
-            }
-
+        // Apply status + department filtering
+        if (status == null || "ALL".equalsIgnoreCase(String.valueOf(status))) {
+            // Fetch tickets filtered by department only
+            ticketPage = ticketRepository.findByTicketDepartment(userDepartment, pageRequest);
         } else {
-            // Fetch all tickets
-            ticketPage = ticketRepository.findAll(pageRequest);
+            // Fetch tickets filtered by both department and status
+            ticketPage = ticketRepository.findByTicketDepartmentAndStatus(userDepartment, status, pageRequest);
         }
 
         List<TicketDTO> ticketDTOs = ticketPage.getContent().stream()
                 .map(ticketMapper::toDTO)
                 .collect(Collectors.toList());
 
-        // Return a paginated response
         return new PaginatedResponse<>(
                 ticketDTOs,
                 ticketPage.getNumber(),
@@ -319,6 +364,7 @@ public class TicketService {
                 ticketPage.isLast()
         );
     }
+
 
 
     private User findExecutiveByLocationAndDepartment(Long locationId, TicketDepartment department) {
@@ -348,7 +394,10 @@ public class TicketService {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new RuntimeException("Ticket not found"));
 
-        User oldTicketAssignee = ticket.getAssignee();
+        User oldTicketAssignee = ticket.getAssignee() != null
+                ? ticket.getAssignee()
+                : new User(); // creates an empty User object if assignee is null
+
 
         User assignee = userRepository.findByEmployeeId(empId)
                 .orElseThrow(() -> new RuntimeException("Assignee user not found"));
@@ -366,6 +415,7 @@ public class TicketService {
         TicketMessage message = new TicketMessage();
         message.setTicket(updatedTicket);
         message.setSender(updater); // The user updating the status
+//        assert oldTicketAssignee != null;
         message.setMessage("Ticket assignee changed from " + oldTicketAssignee.getUsername() + " to " + updatedTicket.getAssignee().getUsername());
         message.setSentAt(LocalDateTime.now());
         message.setStatusUpdatedBy(updater);
@@ -877,9 +927,9 @@ public class TicketService {
                 ticket.getDescription(),
                 ticket.getCategory(),
                 ticket.getStatus(),
-                ticket.getEmployee() != null ? ticket.getEmployee().getUsername() : null,
+                ticket.getEmployee() != null ? userService.convertUserToDto(ticket.getEmployee()) : null,
                 ticket.getCreatedBy(),
-                ticket.getAssignee() != null ? ticket.getAssignee().getUsername() : null,
+                ticket.getAssignee() != null ? userService.convertUserToDto(ticket.getAssignee()) : null,
                 ticket.getAsset() != null ? ticket.getAsset().getAssetTag() : null,
                 ticket.getAsset() != null ? ticket.getAsset().getName() : "Other",
                 ticket.getLocation() != null ? ticket.getLocation().getName() : null,
