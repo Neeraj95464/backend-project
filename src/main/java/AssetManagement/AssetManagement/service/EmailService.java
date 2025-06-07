@@ -6,6 +6,7 @@ import AssetManagement.AssetManagement.entity.TicketMessage;
 import AssetManagement.AssetManagement.entity.User;
 import AssetManagement.AssetManagement.enums.TicketCategory;
 import AssetManagement.AssetManagement.enums.TicketDepartment;
+import AssetManagement.AssetManagement.enums.TicketMessageType;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import AssetManagement.AssetManagement.exception.UserNotFoundException;
 import AssetManagement.AssetManagement.mapper.TicketMapper;
@@ -55,6 +56,25 @@ public class EmailService {
     private UserRepository userRepository;
     @Autowired
     private TicketMessageRepository ticketMessageRepository;
+    private static final List<String> COMPANY_DOMAINS = List.of(
+            "@mahavirauto.co",
+            "@mahavirgroup.co",
+            "@mahavirauto.in",
+            "@mahavirauto.com",
+            "@mahavirgroup.com",
+            "@mahavirmotors.com",
+            "benelli-india.com",
+            "keeway-india.com",
+            "coastalstar.in",
+            "benelli-hyderabad.com",
+            "zontes-india.com",
+            "qjmotor-india.com",
+            "motomorini-india.com",
+            "mahavirisuzu.com",
+            "mahavirhyd.in",
+            "mahavirauto.in"
+    );
+
 
 //    @Autowired
 //    private JavaMailSender mailSender; // Inject Spring Mail Sender
@@ -215,10 +235,49 @@ public class EmailService {
 
         System.out.println("Sender email: " + senderEmail);
 
-        User sender = userRepository.findByEmail(senderEmail)
-                .orElseThrow(() -> new UserNotFoundException("User not found"));
+//        User sender = userRepository.findByEmail(senderEmail)
+//                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
-        System.out.println("User found - Email: " + sender.getEmail());
+        List<User> matchedUsers = userRepository.findAllByEmail(senderEmail);
+
+        User sender;
+
+        if (matchedUsers.size() == 1) {
+            // ✅ Exactly one user found
+            sender = matchedUsers.getFirst();
+        } else if (matchedUsers.isEmpty()) {
+            // ❌ No user found, check company domain
+            boolean domainMatched = COMPANY_DOMAINS.stream().anyMatch(senderEmail::endsWith);
+
+            if (domainMatched) {
+                // ✅ Domain matched, create fallback user
+                sender = new User();
+                sender.setUsername("Unknown User");
+                sender.setEmail(senderEmail);
+                sender.setNote("User not found in DB but domain matched");
+
+                String nextTempEmpId = generateNextTempEmployeeId();
+                sender.setEmployeeId(nextTempEmpId);
+            } else {
+                // ❌ Not allowed to raise ticket if domain doesn't match
+                throw new RuntimeException("Unauthorized sender: Email domain not allowed.");
+            }
+
+        } else {
+            // ❌ Multiple users found
+            sender = new User();
+            sender.setUsername("Multiple Users Found");
+            sender.setEmail(senderEmail);
+            sender.setNote("Multiple users found with the same email");
+
+            // Generate unique temp employeeId
+            String nextTempEmpId = generateNextTempEmployeeId();
+            sender.setEmployeeId(nextTempEmpId);
+        }
+
+        userRepository.save(sender);
+
+        System.out.println("User found - Email: " + sender.getUsername());
 
         ticket.setEmployee(sender);
 
@@ -234,6 +293,22 @@ public class EmailService {
         Ticket savedTicket = ticketRepository.save(ticket);
         return ticketMapper.toDTO(savedTicket);
     }
+
+    private String generateNextTempEmployeeId() {
+        List<String> tempEmpIds = userRepository.findAllEmployeeIdsStartingWith("temp");
+
+        int max = 0;
+        for (String empId : tempEmpIds) {
+            try {
+                int num = Integer.parseInt(empId.replace("temp", ""));
+                if (num > max) max = num;
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
+        return "temp" + (max + 1);
+    }
+
 
 
     private List<String> extractRecipients(jakarta.mail.Message message) throws MessagingException {
@@ -358,10 +433,12 @@ public class EmailService {
     // this method is called when we are sending mail in already created ticket to add like message.
     private void saveReplyToTicket(Long ticketId, String senderEmail, String messageContent,List<String> ccEmails) {
         Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new EntityNotFoundException("Ticket not found"));
+                .orElseThrow(() -> new EntityNotFoundException("Ticket not found in save reply to ticket method with ticket id is "+ticketId));
 
-        User sender = userRepository.findByEmail(senderEmail)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+//        User sender = userRepository.findByEmail(senderEmail)
+//                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+        User sender = ticket.getEmployee();
 
         // ✅ Extract only the latest reply
         String latestReply = extractLatestReply(messageContent);
@@ -376,6 +453,7 @@ public class EmailService {
         ticketMessage.setSender(sender);
         ticketMessage.setMessage(latestReply);
         ticketMessage.setSentAt(LocalDateTime.now());
+        ticketMessage.setTicketMessageType(TicketMessageType.PUBLIC_RESPONSE);
 
         ticketMessageRepository.save(ticketMessage);
         System.out.println("✅ Saved latest reply for Ticket ID: " + ticketId);

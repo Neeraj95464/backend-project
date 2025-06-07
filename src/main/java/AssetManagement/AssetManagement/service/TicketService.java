@@ -83,11 +83,11 @@ public class TicketService {
             System.out.println("Setting department from category: " + deptName);
             ticket.setTicketDepartment(TicketDepartment.valueOf(deptName));
         }
-//        if (category == TicketCategory.CCTV || category == TicketCategory.UPS) {
-//            String deptName = category.name();
-//            System.out.println("Setting department from category: " + deptName);
-//            ticket.setTicketDepartment(TicketDepartment.valueOf(deptName));
-//        }
+        if (category == TicketCategory.FOCUS ) {
+            String deptName = category.name();
+            System.out.println("Setting department from category: " + deptName);
+            ticket.setTicketDepartment(TicketDepartment.valueOf(deptName));
+        }
         else {
             System.out.println("Setting department from DTO: " + ticketDTO.getTicketDepartment());
             ticket.setTicketDepartment(ticketDTO.getTicketDepartment());

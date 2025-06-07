@@ -34,5 +34,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmployeeId(String employeeId);
 
     boolean existsByEmail(String email);
+
+    List<User> findAllByEmail(String senderEmail);
+
+    @Query("SELECT u.employeeId FROM User u WHERE u.employeeId LIKE 'temp%'")
+    List<String> findAllEmployeeIdsStartingWith(@Param("prefix") String prefix);
+
 }
 

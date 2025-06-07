@@ -83,9 +83,9 @@ public class AuthController {
             throw new BadRequestException("Employee ID already exists.");
         }
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BadRequestException("Email already registered.");
-        }
+//        if (userRepository.existsByEmail(request.getEmail())) {
+//            throw new BadRequestException("Email already registered.");
+//        }
 
         String userEmpId = AuthUtils.getAuthenticatedUsername();
         User isNormalUser= userRepository.findByEmployeeId(userEmpId)

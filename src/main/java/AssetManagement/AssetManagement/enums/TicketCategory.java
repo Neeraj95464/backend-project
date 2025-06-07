@@ -31,6 +31,11 @@ public enum TicketCategory {
     HIRING,
     PAYROLL,
     POLICY,
-    PAYSLIP
+    PAYSLIP,
+    RECRUITMENT,
+    HR_OPERATIONS,
+    GENERAL_HR_QUERIES
+
+
 }
 

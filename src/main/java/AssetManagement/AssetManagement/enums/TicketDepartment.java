@@ -6,5 +6,6 @@ public enum TicketDepartment {
     ADMIN,
     FINANCE,
     CCTV,
-    UPS
+    UPS,
+    FOCUS
 }
