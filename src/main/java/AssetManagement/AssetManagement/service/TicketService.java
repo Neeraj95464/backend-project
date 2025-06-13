@@ -82,8 +82,7 @@ public class TicketService {
             String deptName = category.name();
             System.out.println("Setting department from category: " + deptName);
             ticket.setTicketDepartment(TicketDepartment.valueOf(deptName));
-        }
-        if (category == TicketCategory.FOCUS ) {
+        } else if (category == TicketCategory.FOCUS ) {
             String deptName = category.name();
             System.out.println("Setting department from category: " + deptName);
             ticket.setTicketDepartment(TicketDepartment.valueOf(deptName));
@@ -92,7 +91,6 @@ public class TicketService {
             System.out.println("Setting department from DTO: " + ticketDTO.getTicketDepartment());
             ticket.setTicketDepartment(ticketDTO.getTicketDepartment());
         }
-
 
         Location location = locationRepository.findById(ticketDTO.getLocation())
                 .orElseThrow(() -> new EntityNotFoundException("Location not found"));
@@ -604,6 +602,11 @@ public class TicketService {
         return ResponseEntity.ok(savedAssignment);
     }
 
+    // TicketService.java
+    public List<AssigneeFeedbackDTO> getFeedbackGroupedByAssignee() {
+        return ticketFeedbackRepository.getFeedbackGroupedByAssignee();
+    }
+
 
     public ResponseEntity<String> updateFedback(Long ticketId, int rating) {
         Ticket ticket = ticketRepository.findById(ticketId)
@@ -867,17 +870,46 @@ public class TicketService {
 //                .collect(Collectors.toList());
 //    }
 
+//    public List<UserIdNameDTO> getAllUserIdAndNames() {
+//        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+//                .orElseThrow(()->new UserNotFoundException("Authenticated User not found"));
+//        TicketDepartment ticketDepartment= TicketDepartment.valueOf(user.getDepartment().name());
+//
+//        return locationAssignmentRepository.findAll()
+//                .stream()
+//                .flatMap(la -> Stream.of(
+//                        new UserIdNameDTO(la.getItExecutive().getEmployeeId(), la.getItExecutive().getUsername()),
+//                        new UserIdNameDTO(la.getLocationManager().getEmployeeId(), la.getLocationManager().getUsername())
+//                ))
+//                .distinct() // This will eliminate duplicate users based on equals/hashCode in DTO
+//                .collect(Collectors.toList());
+//    }
+
+
     public List<UserIdNameDTO> getAllUserIdAndNames() {
-        return locationAssignmentRepository.findAll()
-                .stream()
+        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(() -> new UserNotFoundException("Authenticated User not found"));
+
+        TicketDepartment userDepartment = TicketDepartment.valueOf(user.getDepartment().name());
+
+        List<LocationAssignment> assignments;
+
+        if (userDepartment == TicketDepartment.HR) {
+            // Get only HR-related assignments
+            assignments = locationAssignmentRepository.findByTicketDepartment(TicketDepartment.HR);
+        } else {
+            // Get all assignments EXCEPT HR
+            assignments = locationAssignmentRepository.findByTicketDepartmentNot(TicketDepartment.HR);
+        }
+
+        return assignments.stream()
                 .flatMap(la -> Stream.of(
                         new UserIdNameDTO(la.getItExecutive().getEmployeeId(), la.getItExecutive().getUsername()),
                         new UserIdNameDTO(la.getLocationManager().getEmployeeId(), la.getLocationManager().getUsername())
                 ))
-                .distinct() // This will eliminate duplicate users based on equals/hashCode in DTO
+                .distinct()
                 .collect(Collectors.toList());
     }
-
 
 
     private TicketDTO convertTicketToDTO(Ticket ticket) {
@@ -1043,7 +1075,7 @@ public class TicketService {
 
         List<Long> resolutionTimes = tickets.stream()
                 .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null &&
-                        (t.getStatus() == TicketStatus.RESOLVED || t.getStatus() == TicketStatus.CLOSED))
+                        (t.getStatus() == TicketStatus.CLOSED))
                 .map(t -> java.time.Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
                 .collect(Collectors.toList());
 

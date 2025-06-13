@@ -155,12 +155,13 @@ public class UserService {
         dto.setNote(user.getNote());
         dto.setLocation(user.getLocation());
         dto.setSite(user.getSite());
+        dto.setSerialNumbers(null);
 
         // Ensure assigned assets are correctly mapped as a List<Asset>
-        dto.setSerialNumbers(Optional.ofNullable(user.getAssignedAssets())
-                .orElse(Collections.emptyList())
-                .stream()
-                .collect(Collectors.toList())); // Keep it as List<Asset>
+//        dto.setSerialNumbers(Optional.ofNullable(user.getAssignedAssets())
+//                .orElse(Collections.emptyList())
+//                .stream()
+//                .collect(Collectors.toList())); // Keep it as List<Asset>
 
         return dto;
     }

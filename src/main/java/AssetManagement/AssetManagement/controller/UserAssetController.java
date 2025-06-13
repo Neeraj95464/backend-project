@@ -418,6 +418,13 @@ public class UserAssetController {
         return ResponseEntity.ok(ticketService.getTicketCountByLocation());
     }
 
+    // TicketFeedbackController.java
+
+    @GetMapping("/feedback/all")
+    public ResponseEntity<List<AssigneeFeedbackDTO>> getAllFeedbacksGroupedByAssignee() {
+        return ResponseEntity.ok(ticketService.getFeedbackGroupedByAssignee());
+    }
+
 
 
 

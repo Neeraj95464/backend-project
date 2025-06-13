@@ -35,6 +35,5 @@ public class LocationService {
         return locationRepository.save(location);
     }
 
-
 }
 

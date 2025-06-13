@@ -1,12 +1,11 @@
 package AssetManagement.AssetManagement.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.annotation.Nonnull;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 
 import java.util.List;
 
@@ -15,6 +14,7 @@ import java.util.List;
 @NoArgsConstructor
 @Data
 @ToString(exclude = "locations")
+@Builder
 public class Site {
 
     @Id
@@ -29,6 +29,6 @@ public class Site {
     private String country;
 
     @OneToMany(mappedBy = "site", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonBackReference
+    @JsonManagedReference
     private List<Location> locations;
 }
