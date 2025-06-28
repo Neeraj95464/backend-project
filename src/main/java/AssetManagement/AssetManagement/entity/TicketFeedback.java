@@ -23,5 +23,7 @@ public class TicketFeedback {
     private int rating;
 
     private LocalDateTime submittedAt;
+
+    private String message;
 }
 

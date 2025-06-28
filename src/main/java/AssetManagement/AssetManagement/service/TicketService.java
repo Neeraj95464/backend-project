@@ -341,10 +341,14 @@ public class TicketService {
         Page<Ticket> ticketPage;
 
         // Apply status + department filtering
-        if (status == null || "ALL".equalsIgnoreCase(String.valueOf(status))) {
+        if (status != null && "UNASSIGNED".equalsIgnoreCase(status.name())) {
+            // Fetch unassigned tickets (assignee is null)
+            ticketPage = ticketRepository.findByStatus(status,pageRequest);
+        } else if (status == null || "ALL".equalsIgnoreCase(String.valueOf(status))) {
             // Fetch tickets filtered by department only
             ticketPage = ticketRepository.findByTicketDepartment(userDepartment, pageRequest);
-        } else {
+        }
+         else {
             // Fetch tickets filtered by both department and status
             ticketPage = ticketRepository.findByTicketDepartmentAndStatus(userDepartment, status, pageRequest);
         }
@@ -362,6 +366,58 @@ public class TicketService {
                 ticketPage.isLast()
         );
     }
+
+//    public PaginatedResponse<TicketDTO> getAllTicketsForAdmin(int page, int size, TicketStatus status) {
+//        // Fetch authenticated user
+//        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+//                .orElseThrow(() -> new UserNotFoundException("Authenticated User not found"));
+//
+//        String role = user.getRole();
+//        if (!role.equalsIgnoreCase("ADMIN")) {
+//            throw new RuntimeException("Access Denied: Only admins can view all tickets.");
+//        }
+//
+//        TicketDepartment userDepartment = TicketDepartment.valueOf(user.getDepartment().name()); // Assuming it's already TicketDepartment enum
+//        boolean isHR = userDepartment == TicketDepartment.HR;
+//
+//        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+//        Page<Ticket> ticketPage;
+//
+//        // If status == null or ALL
+//        if (status == null || "ALL".equalsIgnoreCase(status.name())) {
+//            if (isHR) {
+//                // HR admin: fetch tickets where department is HR OR NULL
+//                ticketPage = ticketRepository.findByTicketDepartmentIsNullOrTicketDepartment(
+//                        TicketDepartment.HR, pageRequest);
+//            } else {
+//                // Other admin: fetch by department only
+//                ticketPage = ticketRepository.findByTicketDepartment(userDepartment, pageRequest);
+//            }
+//        } else {
+//            if (isHR) {
+//                // HR admin: fetch by department OR null + status
+//                ticketPage = ticketRepository.findByStatusAndTicketDepartmentIsNullOrTicketDepartment(
+//                        status, TicketDepartment.HR, pageRequest);
+//            } else {
+//                // Other admin: fetch by department and status
+//                ticketPage = ticketRepository.findByTicketDepartmentAndStatus(userDepartment, status, pageRequest);
+//            }
+//        }
+//
+//        List<TicketDTO> ticketDTOs = ticketPage.getContent().stream()
+//                .map(ticketMapper::toDTO)
+//                .collect(Collectors.toList());
+//
+//        return new PaginatedResponse<>(
+//                ticketDTOs,
+//                ticketPage.getNumber(),
+//                ticketPage.getSize(),
+//                ticketPage.getTotalElements(),
+//                ticketPage.getTotalPages(),
+//                ticketPage.isLast()
+//        );
+//    }
+
 
 
 
@@ -535,38 +591,192 @@ public class TicketService {
     }
 
 
+//    public List<LocationAssignmentDTO> getAllAssignments() {
+//        List<Location> locations = locationRepository.findAll();
+//
+//        return locations.stream().map(location -> {
+//            List<LocationAssignment> assignments = locationAssignmentRepository.findByLocation(location);
+//
+//            // Pick the assignment for the desired department or just the first one if only one is needed
+//            LocationAssignment assignment = assignments.stream()
+//                    .filter(a -> a.getTicketDepartment() == TicketDepartment.IT) // example, adjust as needed
+//                    .findFirst()
+//                    .orElse(null);
+//
+//            TicketDepartment ticketDepartment = assignment != null ? assignment.getTicketDepartment() : TicketDepartment.IT;
+//
+//            String executiveUsername = (assignment != null && assignment.getItExecutive() != null && assignment.getItExecutive().getUsername() != null)
+//                    ? assignment.getItExecutive().getUsername()
+//                    : "null";
+//
+//            String managerUsername = (assignment != null && assignment.getLocationManager() != null && assignment.getLocationManager().getUsername() != null)
+//                    ? assignment.getLocationManager().getUsername()
+//                    : "null";
+//
+//
+//            return new LocationAssignmentDTO(
+//                    location.getId(),
+//                    location.getName(),
+//                    ticketDepartment,
+//                    executiveUsername,
+//                    managerUsername
+//            );
+//        }).toList();
+//    }
+
+
+//    public List<LocationAssignmentDTO> getAllAssignments() {
+//        User currentUser = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+//                .orElseThrow(()->new UserNotFoundException("Authenticated user not found"));
+//        TicketDepartment userDept = TicketDepartment.valueOf(String.valueOf(currentUser.getDepartment())); // Assuming User has a department field
+//
+//        boolean isHR = userDept == TicketDepartment.HR;
+//
+//        List<Location> locations = locationRepository.findAll();
+//
+//        return locations.stream()
+//                .flatMap(location -> {
+//                    List<LocationAssignment> assignments = locationAssignmentRepository.findByLocation(location);
+//
+//                    // Filter based on user's department
+//                    return assignments.stream()
+//                            .filter(a -> isHR ? a.getTicketDepartment() == TicketDepartment.HR
+//                                    : a.getTicketDepartment() != TicketDepartment.HR)
+//                            .map(assignment -> {
+//                                TicketDepartment ticketDepartment = assignment.getTicketDepartment();
+//
+//                                String executiveUsername = (assignment.getItExecutive() != null &&
+//                                        assignment.getItExecutive().getUsername() != null)
+//                                        ? assignment.getItExecutive().getUsername()
+//                                        : "null";
+//
+//                                String managerUsername = (assignment.getLocationManager() != null &&
+//                                        assignment.getLocationManager().getUsername() != null)
+//                                        ? assignment.getLocationManager().getUsername()
+//                                        : "null";
+//
+//                                return new LocationAssignmentDTO(
+//                                        location.getId(),
+//                                        location.getName(),
+//                                        ticketDepartment,
+//                                        executiveUsername,
+//                                        managerUsername
+//                                );
+//                            });
+//                })
+//                .toList();
+//    }
+
+//    public List<LocationAssignmentDTO> getAllAssignments() {
+//        User currentUser = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+//                .orElseThrow(()->new UserNotFoundException("Authenticated user not found"));
+//        TicketDepartment userDept = TicketDepartment.valueOf(String.valueOf(currentUser.getDepartment()));
+//
+//
+//        boolean isHR = userDept == TicketDepartment.HR;
+//
+//        List<Location> locations = locationRepository.findAll();
+//
+//        return locations.stream()
+//                .map(location -> {
+//                    List<LocationAssignment> assignments = locationAssignmentRepository.findByLocation(location);
+//
+//                    // Filter assignments based on user's department
+//                    List<LocationAssignment> filteredAssignments = assignments.stream()
+//                            .filter(a -> isHR ? a.getTicketDepartment() == TicketDepartment.HR
+//                                    : a.getTicketDepartment() != TicketDepartment.HR)
+//                            .toList();
+//
+//                    // If there are no matching assignments, return nulls
+//                    if (filteredAssignments.isEmpty()) {
+//                        return new LocationAssignmentDTO(
+//                                location.getId(),
+//                                location.getName(),
+//                                isHR ? TicketDepartment.HR : null,
+//                                "null",
+//                                "null"
+//                        );
+//                    }
+//
+//                    // You can return one DTO per filtered assignment or pick the first (depending on requirement)
+//                    LocationAssignment assignment = filteredAssignments.get(0);
+//
+//                    String executiveUsername = (assignment.getItExecutive() != null && assignment.getItExecutive().getUsername() != null)
+//                            ? assignment.getItExecutive().getUsername()
+//                            : "null";
+//
+//                    String managerUsername = (assignment.getLocationManager() != null && assignment.getLocationManager().getUsername() != null)
+//                            ? assignment.getLocationManager().getUsername()
+//                            : "null";
+//
+//                    return new LocationAssignmentDTO(
+//                            location.getId(),
+//                            location.getName(),
+//                            assignment.getTicketDepartment(),
+//                            executiveUsername,
+//                            managerUsername
+//                    );
+//                })
+//                .toList();
+//    }
+
     public List<LocationAssignmentDTO> getAllAssignments() {
+        User currentUser = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(() -> new UserNotFoundException("Authenticated user not found"));
+
+        TicketDepartment userDept = TicketDepartment.valueOf(currentUser.getDepartment().name());
+        boolean isHR = userDept == TicketDepartment.HR;
+
         List<Location> locations = locationRepository.findAll();
+        List<TicketDepartment> departments = Arrays.asList(TicketDepartment.values());
 
-        return locations.stream().map(location -> {
-            List<LocationAssignment> assignments = locationAssignmentRepository.findByLocation(location);
+        List<LocationAssignmentDTO> result = new ArrayList<>();
 
-            // Pick the assignment for the desired department or just the first one if only one is needed
-            LocationAssignment assignment = assignments.stream()
-                    .filter(a -> a.getTicketDepartment() == TicketDepartment.IT) // example, adjust as needed
-                    .findFirst()
-                    .orElse(null);
+        for (Location location : locations) {
+            for (TicketDepartment department : departments) {
 
-            TicketDepartment ticketDepartment = assignment != null ? assignment.getTicketDepartment() : TicketDepartment.IT;
+                // Skip HR department if user is not HR
+                if (!isHR && department == TicketDepartment.HR) {
+                    continue;
+                }
 
-            String executiveUsername = (assignment != null && assignment.getItExecutive() != null && assignment.getItExecutive().getUsername() != null)
-                    ? assignment.getItExecutive().getUsername()
-                    : "null";
+                // Skip non-HR departments if user is HR
+                if (isHR && department != TicketDepartment.HR) {
+                    continue;
+                }
 
-            String managerUsername = (assignment != null && assignment.getLocationManager() != null && assignment.getLocationManager().getUsername() != null)
-                    ? assignment.getLocationManager().getUsername()
-                    : "null";
+                Optional<LocationAssignment> assignmentOpt = locationAssignmentRepository
+                        .findByLocationAndTicketDepartment(location, department);
 
+                String executiveUsername = "null";
+                String managerUsername = "null";
 
-            return new LocationAssignmentDTO(
-                    location.getId(),
-                    location.getName(),
-                    ticketDepartment,
-                    executiveUsername,
-                    managerUsername
-            );
-        }).toList();
+                if (assignmentOpt.isPresent()) {
+                    LocationAssignment assignment = assignmentOpt.get();
+                    if (assignment.getItExecutive() != null) {
+                        executiveUsername = Optional.ofNullable(assignment.getItExecutive().getUsername()).orElse("null");
+                    }
+                    if (assignment.getLocationManager() != null) {
+                        managerUsername = Optional.ofNullable(assignment.getLocationManager().getUsername()).orElse("null");
+                    }
+                }
+
+                result.add(new LocationAssignmentDTO(
+                        location.getId(),
+                        location.getName(),
+                        department,
+                        executiveUsername,
+                        managerUsername
+                ));
+            }
+        }
+
+        return result;
     }
+
+
+
+
 
     @Transactional
     public ResponseEntity<LocationAssignment> assignLocation(LocationAssignmentRequest request) {
@@ -608,63 +818,172 @@ public class TicketService {
     }
 
 
-    public ResponseEntity<String> updateFedback(Long ticketId, int rating) {
+//    public ResponseEntity<String> updateFeedback(Long ticketId, int rating) {
+//        Ticket ticket = ticketRepository.findById(ticketId)
+//                .orElseThrow(() -> new RuntimeException("Ticket not found"));
+//
+//        Optional<TicketFeedback> existingFeedback = ticketFeedbackRepository.findByTicket(ticket);
+//
+//        if (existingFeedback.isPresent()) {
+//            return ResponseEntity.ok(
+//                    "<html><body><h2>You have already submitted feedback for this ticket. 🙏</h2></body></html>"
+//            );
+//        }
+//
+//        TicketFeedback feedback = new TicketFeedback();
+//        feedback.setTicket(ticket);
+//        feedback.setRating(rating);
+//        feedback.setSubmittedAt(LocalDateTime.now());
+//
+//        ticketFeedbackRepository.save(feedback);
+//
+//        return ResponseEntity.ok(
+//                "<html><body><h2>Thank you for your feedback! ⭐</h2></body></html>"
+//        );
+//    }
+
+    public ResponseEntity<String> updateFeedback(Long ticketId, int rating) {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new RuntimeException("Ticket not found"));
 
         Optional<TicketFeedback> existingFeedback = ticketFeedbackRepository.findByTicket(ticket);
 
         if (existingFeedback.isPresent()) {
-            return ResponseEntity.ok(
-                    "<html><body><h2>You have already submitted feedback for this ticket. 🙏</h2></body></html>"
-            );
+            return ResponseEntity.ok("<html><body><h2>You have already submitted feedback 🙏</h2></body></html>");
         }
 
+        // Save rating immediately
         TicketFeedback feedback = new TicketFeedback();
         feedback.setTicket(ticket);
         feedback.setRating(rating);
         feedback.setSubmittedAt(LocalDateTime.now());
-
         ticketFeedbackRepository.save(feedback);
 
-        return ResponseEntity.ok(
-                "<html><body><h2>Thank you for your feedback! ⭐</h2></body></html>"
-        );
+        // If rating is 1 or 5, ask for message
+        if (rating == 1 || rating == 5) {
+            return ResponseEntity.ok("""
+            <html>
+            <body>
+                <h2>Thanks for rating!</h2>
+                <p>We’d really appreciate it if you could tell us more:</p>
+                <form method='post' action='/api/feedback/message'>
+                    <input type='hidden' name='ticketId' value='%d'/>
+                    <textarea name='message' placeholder='Your feedback' required></textarea><br/>
+                    <button type='submit'>Submit Message</button>
+                </form>
+            </body>
+            </html>
+        """.formatted(ticketId));
+        }
+
+        // For ratings 2–4, just thank them
+        return ResponseEntity.ok("<html><body><h2>Thank you for your feedback! ⭐</h2></body></html>");
     }
 
 
+
+
+
+//    public String generateFeedbackEmailHtml(Long ticketId) {
+////        String baseUrl = "https://numerous-gem-accompanied-mac.trycloudflare.com/api/feedback"; // Your backend API endpoint
+//
+//        String baseUrl ="http://localhost:7355/api/feedback";
+//
+//        return """
+//        <html>
+//        <body style="font-family: Arial, sans-serif;">
+//            <p>Hello,</p>
+//            <p>Your support ticket <strong>#%d</strong> has been resolved.</p>
+//            <p>We would love to hear your feedback!</p>
+//            <p>Please click a star below to rate your experience:</p>
+//
+//            <p style="font-size: 24px;">
+//                <a href="%s?ticketId=%d&rating=1">⭐</a>
+//                <a href="%s?ticketId=%d&rating=2">⭐</a>
+//                <a href="%s?ticketId=%d&rating=3">⭐</a>
+//                <a href="%s?ticketId=%d&rating=4">⭐</a>
+//                <a href="%s?ticketId=%d&rating=5">⭐</a>
+//            </p>
+//
+//            <p>Thank you!<br>IT Support Team</p>
+//        </body>
+//        </html>
+//        """.formatted(
+//                ticketId,
+//                baseUrl, ticketId,
+//                baseUrl, ticketId,
+//                baseUrl, ticketId,
+//                baseUrl, ticketId,
+//                baseUrl, ticketId
+//        );
+//    }
+
+//    public String generateFeedbackEmailHtml(Long ticketId) {
+//        String baseUrl = "http://localhost:7355/api/feedback"; // For ratings 2–4
+////        String formUrl = "http://your-frontend.com/feedback-form"; // For ratings 1 and 5
+//
+//        return """
+//        <html>
+//        <body style="font-family: Arial, sans-serif;">
+//            <p>Hello,</p>
+//            <p>Your support ticket <strong>#%d</strong> has been resolved.</p>
+//            <p>We would love to hear your feedback!</p>
+//            <p>Please click a star below to rate your experience:</p>
+//
+//            <p style="font-size: 24px;">
+//                <a href="%s?ticketId=%d&rating=1">⭐</a>
+//                <a href="%s?ticketId=%d&rating=2">⭐</a>
+//                <a href="%s?ticketId=%d&rating=3">⭐</a>
+//                <a href="%s?ticketId=%d&rating=4">⭐</a>
+//                <a href="%s?ticketId=%d&rating=5">⭐</a>
+//            </p>
+//
+//            <p>Thank you!<br>IT Support Team</p>
+//        </body>
+//        </html>
+//        """.formatted(
+//                ticketId,
+////                formUrl, ticketId,
+//                baseUrl, ticketId, // ⭐ 1 → goes to frontend form
+//                baseUrl, ticketId,   // ⭐ 2 → API direct
+//                baseUrl, ticketId,   // ⭐ 3
+//                baseUrl, ticketId,   // ⭐ 4
+//                baseUrl, ticketId    // ⭐ 5 → goes to frontend form
+//        );
+//    }
+
+
     public String generateFeedbackEmailHtml(Long ticketId) {
-        String baseUrl = "https://numerous-gem-accompanied-mac.trycloudflare.com/api/feedback"; // Your backend API endpoint
+        String feedbackApiUrl = "http://localhost:7355/api/feedback"; // Update with real domain in prod
 
         return """
         <html>
-        <body style="font-family: Arial, sans-serif;">
+        <body style="font-family: Arial, sans-serif; line-height: 1.6;">
             <p>Hello,</p>
             <p>Your support ticket <strong>#%d</strong> has been resolved.</p>
             <p>We would love to hear your feedback!</p>
             <p>Please click a star below to rate your experience:</p>
 
             <p style="font-size: 24px;">
-                <a href="%s?ticketId=%d&rating=1">⭐</a>
-                <a href="%s?ticketId=%d&rating=2">⭐</a>
-                <a href="%s?ticketId=%d&rating=3">⭐</a>
-                <a href="%s?ticketId=%d&rating=4">⭐</a>
-                <a href="%s?ticketId=%d&rating=5">⭐</a>
+                <a href="%s?ticketId=%d&rating=1" title="Very Dissatisfied">⭐</a>
+                <a href="%s?ticketId=%d&rating=2" title="Dissatisfied">⭐</a>
+                <a href="%s?ticketId=%d&rating=3" title="Neutral">⭐</a>
+                <a href="%s?ticketId=%d&rating=4" title="Satisfied">⭐</a>
+                <a href="%s?ticketId=%d&rating=5" title="Very Satisfied">⭐</a>
             </p>
 
-            <p>Thank you!<br>IT Support Team</p>
+            <p>Thank you!<br><strong>IT Support Team</strong></p>
         </body>
         </html>
-        """.formatted(
+    """.formatted(
                 ticketId,
-                baseUrl, ticketId,
-                baseUrl, ticketId,
-                baseUrl, ticketId,
-                baseUrl, ticketId,
-                baseUrl, ticketId
+                feedbackApiUrl, ticketId,
+                feedbackApiUrl, ticketId,
+                feedbackApiUrl, ticketId,
+                feedbackApiUrl, ticketId,
+                feedbackApiUrl, ticketId
         );
     }
-
 
 
 
@@ -859,16 +1178,6 @@ public class TicketService {
         return tickets.stream().map(this::convertTicketToDTO).collect(Collectors.toList());
     }
 
-//    public List<UserIdNameDTO> getAllUserIdAndNames() {
-//        return locationAssignmentRepository.findAll()
-//                .stream()
-//                .map(la -> new UserIdNameDTO(
-//                        la.getItExecutive().getEmployeeId(), // Use employeeId instead of ID
-//                        la.getItExecutive().getUsername()
-//                ))
-//                .distinct()
-//                .collect(Collectors.toList());
-//    }
 
 //    public List<UserIdNameDTO> getAllUserIdAndNames() {
 //        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
@@ -910,6 +1219,44 @@ public class TicketService {
                 .distinct()
                 .collect(Collectors.toList());
     }
+
+//    public List<LocationAssignmentDTOResponse> getAllLocationDepartmentAssignments() {
+//        List<Location> allLocations = locationRepository.findAll();
+//        List<TicketDepartment> departments = Arrays.asList(TicketDepartment.values());
+//
+//        List<LocationAssignmentDTOResponse> result = new ArrayList<>();
+//
+//        for (Location location : allLocations) {
+//            for (TicketDepartment department : departments) {
+//                Optional<LocationAssignment> assignmentOpt = locationAssignmentRepository
+//                        .findByLocationAndTicketDepartment(location, department);
+//
+//                LocationAssignmentDTOResponse dto = new LocationAssignmentDTOResponse();
+//                dto.setLocation(location.getName());
+//                dto.setDepartment(department);
+//
+//                if (assignmentOpt.isPresent()) {
+//                    LocationAssignment assignment = assignmentOpt.get();
+//                    dto.setItExecutive(new UserIdNameDTO(
+//                            assignment.getItExecutive().getEmployeeId(),
+//                            assignment.getItExecutive().getUsername()
+//                    ));
+//                    dto.setLocationManager(new UserIdNameDTO(
+//                            assignment.getLocationManager().getEmployeeId(),
+//                            assignment.getLocationManager().getUsername()
+//                    ));
+//                } else {
+//                    dto.setItExecutive(null);
+//                    dto.setLocationManager(null);
+//                }
+//
+//                result.add(dto);
+//            }
+//        }
+//
+//        return result;
+//    }
+
 
 
     private TicketDTO convertTicketToDTO(Ticket ticket) {

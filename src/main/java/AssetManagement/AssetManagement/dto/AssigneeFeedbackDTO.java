@@ -6,6 +6,7 @@ public interface AssigneeFeedbackDTO {
     String getAssigneeName();
     Double getAverageRating();
     Long getTotalFeedbacks();
+
 }
 
 

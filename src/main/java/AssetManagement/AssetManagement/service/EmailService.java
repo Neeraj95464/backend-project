@@ -230,6 +230,7 @@ public class EmailService {
         ticket.setTitle(emailSubject);
         ticket.setDescription(emailBody);
         ticket.setCategory(TicketCategory.OTHER);
+//        ticket.setTicketDepartment(null);
         ticket.setTicketDepartment(TicketDepartment.IT);
 //        ticket.setStatus(TicketStatus.OPEN);
 
@@ -379,20 +380,70 @@ public class EmailService {
         return result.toString();
     }
 
-    private String extractLatestReply(String fullMessage) {
-        String[] lines = fullMessage.split("\n");
-        StringBuilder latestReply = new StringBuilder();
+//    private String extractLatestReply(String fullMessage) {
+//        String[] lines = fullMessage.split("\n");
+//        StringBuilder latestReply = new StringBuilder();
+//
+//        for (String line : lines) {
+//            // Stop reading if the line contains previous email indicators
+//            if (line.startsWith(">") || line.contains("On ") || line.contains("wrote:") || line.contains("From:")) {
+//                break;
+//            }
+//            latestReply.append(line).append("\n");
+//        }
+//
+//        return latestReply.toString().trim();
+//    }
 
-        for (String line : lines) {
-            // Stop reading if the line contains previous email indicators
-            if (line.startsWith(">") || line.contains("On ") || line.contains("wrote:") || line.contains("From:")) {
-                break;
+//private String extractLatestReply(String fullMessage) {
+//    if (fullMessage == null || fullMessage.isBlank()) return "";
+//
+//    String[] lines = fullMessage.split("\\r?\\n");
+//    StringBuilder latestReply = new StringBuilder();
+//
+//    for (String rawLine : lines) {
+//        String line = rawLine.trim().toLowerCase();
+//
+//        // Stop if this line indicates beginning of quoted email
+//        if (line.startsWith("from:") || line.startsWith("sent:") ||
+//            line.startsWith("subject:") || line.startsWith("to:") ||
+//            line.contains("wrote:") || (line.startsWith("on ") && line.contains("wrote:"))) {
+//            break;
+//        }
+//
+//        latestReply.append(rawLine).append("\n");
+//    }
+//
+//    return latestReply.toString().trim();
+//}
+
+    private String extractLatestReply(String fullMessage) {
+        if (fullMessage == null || fullMessage.isBlank()) return "";
+
+        // Normalize line breaks for consistency
+        String normalized = fullMessage.replaceAll("\\r\\n|\\r", "\n");
+
+        // Try to detect start of previous email thread using regex (non-greedy)
+        String[] splitMarkers = {
+                "From:", "Sent:", "Subject:", "To:", "Cc:", "On .* wrote:"
+        };
+
+        for (String marker : splitMarkers) {
+            Pattern pattern = Pattern.compile("(?i)" + Pattern.quote(marker)); // case-insensitive
+            Matcher matcher = pattern.matcher(normalized);
+
+            if (matcher.find()) {
+                // Return content before this marker
+                return normalized.substring(0, matcher.start()).trim();
             }
-            latestReply.append(line).append("\n");
         }
 
-        return latestReply.toString().trim();
+        // Fallback: return entire trimmed message
+        return normalized.trim();
     }
+
+
+
 
 
     public void sendReplyToTicket(Long ticketId, String messageContent) {
@@ -438,10 +489,56 @@ public class EmailService {
 //        User sender = userRepository.findByEmail(senderEmail)
 //                .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
-        User sender = ticket.getEmployee();
+//        User sender = ticket.getEmployee();
+        List<User> matchedUsers = userRepository.findAllByEmail(senderEmail);
+
+        User sender;
+
+        if (matchedUsers.size() == 1) {
+            // ✅ Exactly one user found
+            sender = matchedUsers.getFirst();
+        } else if (matchedUsers.isEmpty()) {
+            // ❌ No user found, check company domain
+            boolean domainMatched = COMPANY_DOMAINS.stream().anyMatch(senderEmail::endsWith);
+
+            if (domainMatched) {
+                // ✅ Domain matched, create fallback user
+                sender = new User();
+                sender.setUsername("Unknown User");
+                sender.setEmail(senderEmail);
+                sender.setNote("User not found in DB but domain matched");
+
+                String nextTempEmpId = generateNextTempEmployeeId();
+                sender.setEmployeeId(nextTempEmpId);
+            } else {
+                // ❌ Not allowed to raise ticket if domain doesn't match
+                throw new RuntimeException("Unauthorized sender: Email domain not allowed.");
+            }
+
+        } else {
+            // ❌ Multiple users found
+            sender = new User();
+            sender.setUsername("Multiple Users Found");
+            sender.setEmail(senderEmail);
+            sender.setNote("Multiple users found with the same email");
+
+            // Generate unique temp employeeId
+            String nextTempEmpId = generateNextTempEmployeeId();
+            sender.setEmployeeId(nextTempEmpId);
+        }
+
+        userRepository.save(sender);
+        String recipient;
+
+        if(sender == ticket.getEmployee()){
+            recipient = ticket.getAssignee().getEmail();
+        } else if (sender == ticket.getAssignee()) {
+
+        }
 
         // ✅ Extract only the latest reply
         String latestReply = extractLatestReply(messageContent);
+        System.out.println("Mail reply received ticket id and message is "+ticketId +" "+latestReply);
 
         // ✅ Ensure message is within a safe length limit
         if (latestReply.length() > 5000) {
@@ -457,6 +554,15 @@ public class EmailService {
 
         ticketMessageRepository.save(ticketMessage);
         System.out.println("✅ Saved latest reply for Ticket ID: " + ticketId);
+
+//        sendEmailViaGraph(
+//                recipient,
+//                "Ticket ID: " + ticket.getId() + " - " +
+//                        (originalSubject != null ? originalSubject : ticket.getTitle());,
+//                "<p>New update on your ticket:</p><p>" + messageContent + "</p>",
+//                ticket.getCcEmails()// optional cc
+////                threadId
+//        );
     }
 
 
@@ -547,7 +653,8 @@ public class EmailService {
 
             List<Message> messages = results.getCurrentPage();
             if (messages.isEmpty()) {
-                System.err.println("❌ No message found with internetMessageId: " + inReplyToMessageId);
+                System.err.println("❌ No message found with internetMessageId: " + inReplyToMessageId
+                        + "In ticket #"+ticketId);
                 return;
             }
 

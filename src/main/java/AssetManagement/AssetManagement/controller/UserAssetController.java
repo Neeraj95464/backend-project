@@ -78,6 +78,8 @@ public class UserAssetController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) TicketStatus status) {
 
+//        System.out.println("Request received with "+status);
+
         PaginatedResponse<TicketDTO> response = ticketService.getAllTicketsForAdmin(page, size, status);
         return ResponseEntity.ok(response);
     }
@@ -130,7 +132,7 @@ public class UserAssetController {
         return ResponseEntity.ok(ticketDTO);
     }
 
-    @PutMapping("/tickets/{ticketId}/category/{category}")
+    @PutMapping("//user-assets/tickets/{ticketId}/category/{category}")
     public ResponseEntity<TicketDTO> updateTicketCategory(
             @PathVariable Long ticketId,
             @PathVariable TicketCategory category
@@ -306,6 +308,14 @@ public class UserAssetController {
         return ResponseEntity.ok(users);
     }
 
+//    @GetMapping("/assignees")
+//    public ResponseEntity<List<LocationAssignmentDTOResponse>> getAllAssigneesLocationAndDepartmentWise() {
+//        List<LocationAssignmentDTOResponse> assignments = ticketService.getAllLocationDepartmentAssignments();
+//        System.out.println("Sending assignees data ");
+//        return ResponseEntity.ok(assignments);
+//    }
+
+
     @PostMapping("/tickets/{ticketId}/messages")
     public ResponseEntity<TicketMessageDTO> addMessage(@PathVariable Long ticketId, @RequestBody TicketMessageDTO messageDTO) {
 
@@ -346,6 +356,13 @@ public class UserAssetController {
     public List<LocationAssignmentDTO> getAllAssignments() {
         return ticketService.getAllAssignments();
     }
+
+//    @GetMapping("/all/locations-assignments")
+//    public ResponseEntity<List<LocationAssignmentDTO>> getAllAssignments() {
+//        List<LocationAssignmentDTO> assignments = ticketService.getAllLocationDepartmentAssignments();
+//        System.out.println("Sending assignees data from all api ");
+//        return ResponseEntity.ok(assignments);
+//    }
 
     @PostMapping("/assign")
     public ResponseEntity<String> assign(@RequestBody LocationAssignmentRequest request) {
@@ -401,9 +418,9 @@ public class UserAssetController {
 
     @GetMapping("/tickets/stats/resolution/assignee/{employeeId}")
     public ResolutionTimeStatsDTO getResolutionStatsByAssignee(@PathVariable String employeeId) {
-        System.out.println("Request came with employee id "+employeeId);
+//        System.out.println("Request came with employee id "+employeeId);
         ResolutionTimeStatsDTO stats = ticketService.getAssigneeResolutionStats(employeeId);
-        System.out.println("stats is "+ stats);
+//        System.out.println("stats is "+ stats);
         return stats;
     }
 

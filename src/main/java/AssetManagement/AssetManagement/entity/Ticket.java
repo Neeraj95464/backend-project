@@ -48,7 +48,6 @@ public class Ticket {
         private User assignee; // Who is assigned to resolve the ticket
 
         @Enumerated(EnumType.STRING)
-        @NotNull
         private TicketDepartment ticketDepartment;
 
         @ManyToOne

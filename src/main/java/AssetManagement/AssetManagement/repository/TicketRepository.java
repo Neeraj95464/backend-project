@@ -8,6 +8,7 @@ import AssetManagement.AssetManagement.enums.TicketDepartment;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -60,5 +61,10 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
     Page<Ticket> findByTicketDepartmentAndStatus(TicketDepartment ticketDepartment, TicketStatus status, Pageable pageable);
 
 
+    Page<Ticket> findByTicketDepartmentIsNullOrTicketDepartment(TicketDepartment ticketDepartment, PageRequest pageRequest);
+
+    Page<Ticket> findByStatusAndTicketDepartmentIsNullOrTicketDepartment(TicketStatus status, TicketDepartment ticketDepartment, PageRequest pageRequest);
+
+    Page<Ticket> findByAssigneeIsNull(PageRequest pageRequest);
 }
 

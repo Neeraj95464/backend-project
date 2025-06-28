@@ -48,7 +48,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/user-assets/**").hasAnyRole("USER","ADMIN")
                         .requestMatchers("/api/asset-photos/uploads/**").permitAll()
                         .requestMatchers("/api/asset-documents/uploads/**").permitAll()
-                        .requestMatchers("/api/feedback**").permitAll()
+                        .requestMatchers("/api/feedback/**").permitAll()
                         .anyRequest().authenticated()  // ✅ Any other request must be authenticated
                 )
                 .exceptionHandling(exception -> exception
