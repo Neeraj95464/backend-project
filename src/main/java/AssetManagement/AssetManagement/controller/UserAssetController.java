@@ -5,6 +5,7 @@ import AssetManagement.AssetManagement.entity.LocationAssignment;
 import AssetManagement.AssetManagement.entity.Ticket;
 import AssetManagement.AssetManagement.enums.TicketCategory;
 import AssetManagement.AssetManagement.enums.TicketStatus;
+import AssetManagement.AssetManagement.repository.TicketRepository;
 import AssetManagement.AssetManagement.service.TicketService;
 import AssetManagement.AssetManagement.service.UserAssetService;
 import AssetManagement.AssetManagement.util.AuthUtils;
@@ -23,6 +24,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -50,6 +52,9 @@ public class UserAssetController {
 
     @Autowired
     private UserAssetService userAssetService;
+
+    @Autowired
+    private TicketRepository ticketRepository;
 
     @Autowired
     private TicketService ticketService;
@@ -369,6 +374,44 @@ public class UserAssetController {
         ticketService.assignLocation(request);
         return ResponseEntity.ok("Assignment successful");
     }
+
+    @GetMapping("/by-site/{siteId}")
+    public PaginatedResponse<TicketDTO> getTicketsBySiteWithDate(
+            @PathVariable Long siteId,
+            @RequestParam(defaultValue = "OPEN") TicketStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size
+    ) {
+
+        System.out.println("Request received with Start time "+startDate);
+        System.out.println("Request received with End time "+endDate);
+
+        if (startDate == null) {
+            startDate = LocalDateTime.now().minusDays(30);
+        }
+        if (endDate == null) {
+            endDate = LocalDateTime.now();
+        }
+
+//        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        Page<TicketDTO>  ticketPage =  ticketService.getTicketsBySiteWithDate(
+                siteId, status, startDate, endDate, page,size);
+
+        return new PaginatedResponse<>(
+                ticketPage.getContent(),
+                ticketPage.getNumber(),
+                ticketPage.getSize(),
+                ticketPage.getTotalElements(),
+                ticketPage.getTotalPages(),
+                ticketPage.isLast()
+        );
+    }
+
 
 
 

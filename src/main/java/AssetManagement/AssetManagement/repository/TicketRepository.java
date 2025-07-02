@@ -66,5 +66,13 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
     Page<Ticket> findByStatusAndTicketDepartmentIsNullOrTicketDepartment(TicketStatus status, TicketDepartment ticketDepartment, PageRequest pageRequest);
 
     Page<Ticket> findByAssigneeIsNull(PageRequest pageRequest);
+
+    // Option 1: Using JPA naming convention
+    List<Ticket> findByLocation_Site_Id(Long siteId);
+
+    // Option 2: Explicit JPQL
+    List<Ticket> findByLocation_Site_IdAndStatus(Long siteId, TicketStatus status);
+
+    Page<Ticket> findByLocation_Site_IdAndStatusAndCreatedAtBetween(Long siteId, TicketStatus ticketStatus, LocalDateTime startDate, LocalDateTime endDate, Pageable pageRequest);
 }
 

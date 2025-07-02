@@ -817,6 +817,25 @@ public class TicketService {
         return ticketFeedbackRepository.getFeedbackGroupedByAssignee();
     }
 
+    public Page<TicketDTO> getTicketsBySiteWithDate(Long siteId, TicketStatus status, LocalDateTime startDate, LocalDateTime endDate, int page, int size) {
+        if (startDate == null) {
+            startDate = LocalDateTime.now().minusDays(30);
+        }
+        if (endDate == null) {
+            endDate = LocalDateTime.now();
+        }
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        Page<Ticket> tickets = ticketRepository.findByLocation_Site_IdAndStatusAndCreatedAtBetween(
+                siteId, status, startDate, endDate, pageable);
+
+
+        //        System.out.println("tickets are "+ticketDTO.getTotalElements());
+
+        return tickets.map(this::convertTicketToDTO);
+    }
+
 
 //    public ResponseEntity<String> updateFeedback(Long ticketId, int rating) {
 //        Ticket ticket = ticketRepository.findById(ticketId)

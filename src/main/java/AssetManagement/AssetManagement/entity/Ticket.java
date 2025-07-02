@@ -3,6 +3,7 @@ package AssetManagement.AssetManagement.entity;
 import AssetManagement.AssetManagement.enums.TicketCategory;
 import AssetManagement.AssetManagement.enums.TicketDepartment;
 import AssetManagement.AssetManagement.enums.TicketStatus;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -61,6 +62,7 @@ public class Ticket {
 
         @ManyToOne
         @JoinColumn(name = "asset_id") // Link to Asset Table
+        @JsonIgnoreProperties({"tickets"}) // If Asset has list of tickets
         private Asset asset;
 
         @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL, orphanRemoval = true)
