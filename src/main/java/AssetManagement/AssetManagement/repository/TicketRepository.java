@@ -73,6 +73,25 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
     // Option 2: Explicit JPQL
     List<Ticket> findByLocation_Site_IdAndStatus(Long siteId, TicketStatus status);
 
-    Page<Ticket> findByLocation_Site_IdAndStatusAndCreatedAtBetween(Long siteId, TicketStatus ticketStatus, LocalDateTime startDate, LocalDateTime endDate, Pageable pageRequest);
+//    Page<Ticket> findByLocation_Site_IdAndStatusAndCreatedAtBetween(Long siteId, TicketStatus ticketStatus, LocalDateTime startDate, LocalDateTime endDate, Pageable pageRequest);
+
+    @Query("""
+    SELECT t FROM Ticket t
+    WHERE (:siteId IS NULL OR t.location.site.id = :siteId)
+      AND (:department IS NULL OR t.ticketDepartment = :department)
+      AND (:status IS NULL OR t.status = :status)
+      AND (:startDate IS NULL OR t.createdAt >= :startDate)
+      AND (:endDate IS NULL OR t.createdAt <= :endDate)
+""")
+    Page<Ticket> findByLocation_Site_IdAndStatusAndCreatedAtBetween(
+            @Param("siteId") Long siteId,
+            @Param("department") TicketDepartment department,
+            @Param("status") TicketStatus status,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            Pageable pageable
+    );
+
+
 }
 

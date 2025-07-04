@@ -27,40 +27,6 @@ public class TicketFeedbackController {
         this.ticketFeedbackRepository = ticketFeedbackRepository;
     }
 
-//    @GetMapping
-//    public ResponseEntity<String> submitFeedback(
-//            @RequestParam Long ticketId,
-//            @RequestParam int rating
-//    ) {
-//        System.out.println("Request came with ticketId = " + ticketId + ", rating = " + rating);
-//        return ticketService.updateFeedback(ticketId, rating);
-//    }
-
-//    @PostMapping("/message")
-//    public ResponseEntity<String> submitFeedbackMessage(
-//            @RequestParam Long ticketId,
-//            @RequestParam String message
-//    ) {
-//        if (message == null || message.trim().isEmpty()) {
-//            return ResponseEntity.badRequest().body("<html><body><h3>Feedback message cannot be empty.</h3></body></html>");
-//        }
-//
-//        Ticket ticket = ticketRepository.findById(ticketId)
-//                .orElseThrow(() -> new RuntimeException("Ticket not found"));
-//
-//        TicketFeedback feedback = ticketFeedbackRepository.findByTicket(ticket)
-//                .orElseThrow(() -> new RuntimeException("Feedback not found for this ticket"));
-//
-//        if (feedback.getMessage() != null && !feedback.getMessage().isBlank()) {
-//            return ResponseEntity.ok("<html><body><h3>You've already submitted a message. 🙏</h3></body></html>");
-//        }
-//
-//        feedback.setMessage(message.trim());
-//        ticketFeedbackRepository.save(feedback);
-//
-//        return ResponseEntity.ok("<html><body><h2>Thank you for your detailed feedback! 🙏</h2></body></html>");
-//    }
-
 
     @GetMapping
     public ResponseEntity<String> submitRating(@RequestParam Long ticketId, @RequestParam int rating) {
@@ -90,7 +56,7 @@ public class TicketFeedbackController {
             <head><title>Feedback</title></head>
             <body>
                 <h2>Tell us more about your experience</h2>
-                <form method="get" action="http://localhost:7355/api/feedback/message">
+                <form method="get" action="https://numerous-gem-accompanied-mac.trycloudflare.com/api/feedback/message">
                     <input type="hidden" name="ticketId" value="%d" />
                     <textarea name="message" rows="5" cols="50" placeholder="Write your feedback here..." required></textarea><br/>
                     <button type="submit">Submit</button>

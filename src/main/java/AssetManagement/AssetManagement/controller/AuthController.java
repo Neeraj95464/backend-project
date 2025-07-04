@@ -50,8 +50,6 @@ public class AuthController {
             throw new UsernameNotFoundException("User not found with employeeId: " + authRequest.getEmployeeId());
         }
         User user = optionalUser.get();
-//        System.out.println("User found: " + user.getEmployeeId());
-
 
         Authentication authentication;
         try {
