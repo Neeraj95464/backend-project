@@ -56,6 +56,21 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
     @Query("SELECT t FROM Ticket t WHERE t.createdAt BETWEEN :start AND :end")
     List<Ticket> findTicketsCreatedBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
+    @Query("""
+    SELECT t FROM Ticket t
+    WHERE t.createdAt BETWEEN :start AND :end
+      AND (
+          (:isHrUser = true AND t.ticketDepartment = 'HR') OR
+          (:isHrUser = false AND t.ticketDepartment <> 'HR')
+      )
+""")
+    List<Ticket> findTicketsCreatedBetweenFiltered(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("isHrUser") boolean isHrUser
+    );
+
+
     Page<Ticket> findByTicketDepartment(TicketDepartment ticketDepartment, Pageable pageable);
 
     Page<Ticket> findByTicketDepartmentAndStatus(TicketDepartment ticketDepartment, TicketStatus status, Pageable pageable);

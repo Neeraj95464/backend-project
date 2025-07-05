@@ -393,7 +393,6 @@ public class UserAssetController {
         }
 
 
-
         Page<TicketDTO>  ticketPage =  ticketService.getTicketsBySiteWithDate(
                 siteId, status, startDate, endDate, page,size);
 
@@ -495,11 +494,7 @@ public class UserAssetController {
     // TicketFeedbackController.java
 
     @GetMapping("/feedback/all")
-    public ResponseEntity<List<AssigneeFeedbackDTO>> getAllFeedbacksGroupedByAssignee() {
+    public ResponseEntity<List<AssigneeFeedbackStatsDTO>> getAllFeedbacksGroupedByAssignee() {
         return ResponseEntity.ok(ticketService.getFeedbackGroupedByAssignee());
     }
-
-
-
-
 }

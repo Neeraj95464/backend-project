@@ -581,14 +581,24 @@ public class TicketService {
     }
 
     // TicketService.java
-    public List<AssigneeFeedbackDTO> getFeedbackGroupedByAssignee() {
-        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername()).orElseThrow(
-                ()->new UserNotFoundException("Authenticated user not found ")
-        );
-        TicketDepartment ticketDepartment = TicketDepartment.valueOf(user.getDepartment().name());
+//    public List<AssigneeFeedbackDTO> getFeedbackGroupedByAssignee() {
+//        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername()).orElseThrow(
+//                ()->new UserNotFoundException("Authenticated user not found ")
+//        );
+//        TicketDepartment ticketDepartment = TicketDepartment.valueOf(user.getDepartment().name());
+//
+//        return ticketFeedbackRepository.getFeedbackGroupedByAssignee(ticketDepartment);
+//    }
 
-        return ticketFeedbackRepository.getFeedbackGroupedByAssignee(ticketDepartment);
+    public List<AssigneeFeedbackStatsDTO> getFeedbackGroupedByAssignee() {
+        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(() -> new UserNotFoundException("Authenticated user not found"));
+
+        boolean isHrUser = user.getDepartment().name().equals("HR");
+
+        return ticketFeedbackRepository.getFeedbackGroupedByAssigneeStats(isHrUser);
     }
+
 
     public Page<TicketDTO> getTicketsBySiteWithDate(Long siteId, TicketStatus status, LocalDateTime startDate, LocalDateTime endDate, int page, int size) {
         if (startDate == null) {
@@ -1100,20 +1110,22 @@ public class TicketService {
                 ));
     }
 
-    public Map<String, Long> getTicketCountByAssignee() {
-        ZoneId zone = ZoneId.of("Asia/Kolkata");
-        LocalDate today = LocalDate.now(zone);
-        LocalDate startDate = today.minusDays(29);
-        LocalDateTime startOfDay = startDate.atStartOfDay();
-        LocalDateTime endOfToday = today.atTime(LocalTime.MAX);
+//    public Map<String, Long> getTicketCountByAssignee() {
+//        ZoneId zone = ZoneId.of("Asia/Kolkata");
+//        LocalDate today = LocalDate.now(zone);
+//        LocalDate startDate = today.minusDays(29);
+//        LocalDateTime startOfDay = startDate.atStartOfDay();
+//        LocalDateTime endOfToday = today.atTime(LocalTime.MAX);
+//fff
+//        List<Ticket> tickets = ticketRepository.findTicketsCreatedBetween(startOfDay,endOfToday);
+//        return tickets.stream()
+//                .collect(Collectors.groupingBy(
+//                        t -> t.getAssignee() != null ? t.getAssignee().getUsername() : "Unassigned",
+//                        Collectors.counting()
+//                ));
+//    }
 
-        List<Ticket> tickets = ticketRepository.findTicketsCreatedBetween(startOfDay,endOfToday);
-        return tickets.stream()
-                .collect(Collectors.groupingBy(
-                        t -> t.getAssignee() != null ? t.getAssignee().getUsername() : "Unassigned",
-                        Collectors.counting()
-                ));
-    }
+
 
     public ResolutionTimeStatsDTO getResolutionTimeStats() {
         List<Ticket> tickets = ticketRepository.findAll();
@@ -1212,6 +1224,30 @@ public class TicketService {
 //                ));
 //    }
 
+    public Map<String, Long> getTicketCountByAssignee() {
+        ZoneId zone = ZoneId.of("Asia/Kolkata");
+        LocalDate today = LocalDate.now(zone);
+        LocalDate startDate = today.minusDays(29);
+        LocalDateTime startOfDay = startDate.atStartOfDay();
+        LocalDateTime endOfToday = today.atTime(LocalTime.MAX);
+
+        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(() -> new UserNotFoundException("Authenticated user not found"));
+
+        boolean isHrUser = user.getDepartment().name().equalsIgnoreCase("HR");
+
+        List<Ticket> tickets = ticketRepository.findTicketsCreatedBetweenFiltered(
+                startOfDay, endOfToday, isHrUser
+        );
+
+        return tickets.stream()
+                .collect(Collectors.groupingBy(
+                        t -> t.getAssignee() != null ? t.getAssignee().getUsername() : "Unassigned",
+                        Collectors.counting()
+                ));
+    }
+
+
 //    public Map<String, Long> getTopTicketReporters() {
 //        ZoneId zone = ZoneId.of("Asia/Kolkata");
 //        LocalDate today = LocalDate.now(zone);
@@ -1295,17 +1331,48 @@ public class TicketService {
     }
 
 
+//    public Page<TicketWithFeedbackDTO> getTicketsWithFeedback(String employeeId, int page, int size) {
+//        Pageable pageable = PageRequest.of(page, size, Sort.by("submittedAt").descending());
+//        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername()).orElseThrow(
+//                ()->new UserNotFoundException("Authenticated user not found ")
+//        );
+//        TicketDepartment ticketDepartment = TicketDepartment.valueOf(user.getDepartment().name());
+//
+//        Page<TicketFeedback> feedbackPage = ticketFeedbackRepository.findByDepartmentAndAssignee(ticketDepartment,employeeId, pageable);
+//
+//        return feedbackPage.map(f -> {
+//            Ticket ticket = f.getTicket();
+//            return new TicketWithFeedbackDTO(
+//                    ticket.getId(),
+//                    ticket.getTitle(),
+//                    ticket.getDescription(),
+//                    ticket.getCategory(),
+//                    ticket.getStatus(),
+//                    ticket.getTicketDepartment(),
+//                    ticket.getCreatedBy(),
+//                    ticket.getAssignee() != null ? ticket.getAssignee().getUsername() : "Unassigned",
+//                    ticket.getCreatedAt(),
+//                    f.getRating(),
+//                    f.getMessage(),
+//                    f.getSubmittedAt()
+//            );
+//        });
+//    }
+
+
     public Page<TicketWithFeedbackDTO> getTicketsWithFeedback(String employeeId, int page, int size) {
-//        employeeId=AuthUtils.getAuthenticatedUsername();
         Pageable pageable = PageRequest.of(page, size, Sort.by("submittedAt").descending());
-        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername()).orElseThrow(
-                ()->new UserNotFoundException("Authenticated user not found ")
+
+        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(() -> new UserNotFoundException("Authenticated user not found"));
+
+        boolean isHrUser = user.getDepartment() == Department.HR;
+
+        Page<TicketFeedback> feedbackPage = ticketFeedbackRepository.findFilteredFeedbacks(
+                isHrUser,
+                employeeId != null && !employeeId.isBlank() ? employeeId : null,
+                pageable
         );
-        TicketDepartment ticketDepartment = TicketDepartment.valueOf(user.getDepartment().name());
-
-//        System.out.println("fond ticket feedback "+ticketDepartment + " "+employeeId);
-
-        Page<TicketFeedback> feedbackPage = ticketFeedbackRepository.findByDepartmentAndAssignee(ticketDepartment,employeeId, pageable);
 
         return feedbackPage.map(f -> {
             Ticket ticket = f.getTicket();
@@ -1325,5 +1392,6 @@ public class TicketService {
             );
         });
     }
+
 
 }

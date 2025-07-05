@@ -6,7 +6,9 @@ public interface AssigneeFeedbackDTO {
     String getAssigneeName();
     Double getAverageRating();
     Long getTotalFeedbacks();
-
+    Long getClosedTickets();
+    Long getClosedTicketsWithFeedback();
 }
+
 
 
