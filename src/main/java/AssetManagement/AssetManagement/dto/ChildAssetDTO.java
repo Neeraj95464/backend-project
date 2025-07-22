@@ -12,4 +12,5 @@ public class ChildAssetDTO {
     private String name;
     private String warranty;
     private String purchaseFrom;
+    private String childAssetNote;
 }

@@ -137,11 +137,14 @@ public class UserAssetController {
         return ResponseEntity.ok(ticketDTO);
     }
 
-    @PutMapping("//user-assets/tickets/{ticketId}/category/{category}")
+    @PutMapping("/tickets/{ticketId}/category/{category}")
     public ResponseEntity<TicketDTO> updateTicketCategory(
             @PathVariable Long ticketId,
             @PathVariable TicketCategory category
     ) {
+
+//        System.out.println("Request received with "+ticketId+ " "+category);
+
         TicketDTO updatedTicket = ticketService.updateCategory(ticketId, category);
         return ResponseEntity.ok(updatedTicket);
     }
@@ -155,7 +158,7 @@ public class UserAssetController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        System.out.println("Request came with employee id to fetch tickets "+employeeId);
+//        System.out.println("Request came with employee id to fetch tickets "+employeeId);
         PaginatedResponse<TicketDTO> response = ticketService.getUserTickets(status, employeeId, page, size);
 //        System.out.println(response);
         return ResponseEntity.ok(response);

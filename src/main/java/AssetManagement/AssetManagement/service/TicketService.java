@@ -257,10 +257,14 @@ public class TicketService {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new EntityNotFoundException("Ticket not found"));
 
+//        System.out.println("came here 1");
+
         String oldCategory = ticket.getCategory() != null ? ticket.getCategory().name() : null;
 
         ticket.setCategory(category);
         Ticket savedTicket = ticketRepository.save(ticket);
+
+//        System.out.println("came here 2");
 
         TicketMessage message = new TicketMessage();
         message.setTicket(savedTicket);
@@ -282,8 +286,9 @@ public class TicketService {
                 .orElseThrow(() -> new UserNotFoundException("Authenticated User not found"));
 
         String role = user.getRole();
-        if (!role.equalsIgnoreCase("ADMIN")) {
-            throw new RuntimeException("Access Denied: Only admins can view all tickets.");
+
+        if (!role.equalsIgnoreCase("ADMIN") && !role.equalsIgnoreCase("HR_ADMIN")) {
+            throw new RuntimeException("Access Denied: Only admins and HR admins can view all tickets.");
         }
 
         TicketDepartment userDepartment = TicketDepartment.valueOf(user.getDepartment().name()); // Assuming Department is an enum

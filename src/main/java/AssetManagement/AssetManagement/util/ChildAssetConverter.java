@@ -11,15 +11,19 @@ public class ChildAssetConverter {
         childAsset.setName(dto.getName());
         childAsset.setWarranty(dto.getWarranty());
         childAsset.setPurchaseFrom(dto.getPurchaseFrom());
+        childAsset.setChildAssetNote(dto.getChildAssetNote()); // ✅ Add this line
         childAsset.setParentAsset(parentAsset);
         return childAsset;
     }
+
+
 
     public static ChildAssetDTO toDTO(ChildAsset entity) {
         return new ChildAssetDTO(
                 entity.getName(),
                 entity.getWarranty(),
-                entity.getPurchaseFrom()
+                entity.getPurchaseFrom(),
+                entity.getChildAssetNote()
         );
     }
 }

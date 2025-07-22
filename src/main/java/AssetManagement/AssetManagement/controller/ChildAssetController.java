@@ -16,7 +16,26 @@ public class ChildAssetController {
     private ChildAssetService childAssetService;
 
     // Fetch small child assets by assetTag
-    @GetMapping("/by-asset/{assetTag}")
+//    @GetMapping("/{assetTag}")
+//    public ResponseEntity<List<ChildAssetDTO>> getSmallChildAssets(@PathVariable String assetTag) {
+//        try {
+//            List<ChildAssetDTO> smallChildAssets = childAssetService
+//                    .getSmallChildAssetsByAssetTag(assetTag)
+//                    .stream()
+//                    .map(childAsset -> new ChildAssetDTO(
+//                            childAsset.getName(),
+//                            childAsset.getWarranty(),
+//                            childAsset.getPurchaseFrom(),
+//                            childAsset.getChildAssetNote()))
+//                    .toList();
+//
+//            return ResponseEntity.ok(smallChildAssets);
+//        } catch (Exception e) {
+//            return ResponseEntity.status(404).body(null);
+//        }
+//    }
+
+    @GetMapping("/{assetTag}")
     public ResponseEntity<List<ChildAssetDTO>> getSmallChildAssets(@PathVariable String assetTag) {
         try {
             List<ChildAssetDTO> smallChildAssets = childAssetService
@@ -25,7 +44,8 @@ public class ChildAssetController {
                     .map(childAsset -> new ChildAssetDTO(
                             childAsset.getName(),
                             childAsset.getWarranty(),
-                            childAsset.getPurchaseFrom()))
+                            childAsset.getPurchaseFrom(),
+                            childAsset.getChildAssetNote())) // Make sure this returns correct value
                     .toList();
 
             return ResponseEntity.ok(smallChildAssets);
@@ -33,6 +53,7 @@ public class ChildAssetController {
             return ResponseEntity.status(404).body(null);
         }
     }
+
 
     // Create a small child asset for a given assetTag
     @PostMapping("/create/{assetTag}")

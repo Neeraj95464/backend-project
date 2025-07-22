@@ -19,6 +19,7 @@ public class ChildAsset {
     private String name;
     private String warranty;
     private String purchaseFrom;
+    private String childAssetNote;
 
     @ManyToOne
     @JoinColumn(name = "parent_asset_id")

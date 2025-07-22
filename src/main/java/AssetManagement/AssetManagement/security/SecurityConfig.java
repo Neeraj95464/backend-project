@@ -41,11 +41,11 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/auth/login").permitAll()
-                        .requestMatchers("/api/info").hasAnyRole("USER", "ADMIN", "EXECUTIVE")  // ✅ Only "USER", "ADMIN", "EXECUTIVE" roles can access
+                        .requestMatchers("/api/info").hasAnyRole("USER", "ADMIN", "EXECUTIVE","HR_ADMIN")  // ✅ Only "USER", "ADMIN", "EXECUTIVE" roles can access
                         .requestMatchers("/api/assets/delete/**").hasRole("ADMIN")  // ✅ Only "ADMIN" can delete assets
                         .requestMatchers("/api/assets/**").hasAnyRole("ADMIN","EXECUTIVE")  // ✅ "ADMIN" & "EXECUTIVE" can create assets
-                        .requestMatchers("/api/users/**").hasRole("ADMIN") // ✅ Only "ADMIN" can manage users
-                        .requestMatchers("/api/user-assets/**").hasAnyRole("USER","ADMIN")
+                        .requestMatchers("/api/users/**").hasAnyRole("ADMIN","HR_ADMIN") // ✅ Only "ADMIN" can manage users
+                        .requestMatchers("/api/user-assets/**").hasAnyRole("USER","ADMIN","HR_ADMIN")
                         .requestMatchers("/api/asset-photos/uploads/**").permitAll()
                         .requestMatchers("/api/asset-documents/uploads/**").permitAll()
                         .requestMatchers("/api/feedback/**").permitAll()

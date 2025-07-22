@@ -1,4 +1,4 @@
-package AssetManagement.AssetManagement.dto;
+package AssetManagement.AssetManagement.enums;
 
 public enum Role {
     SUPER_ADMIN,
