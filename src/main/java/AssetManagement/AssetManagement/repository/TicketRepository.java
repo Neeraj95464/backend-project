@@ -108,5 +108,6 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
     );
 
 
+    List<Ticket> findByAssigneeAndCreatedAtBetween(User user, LocalDateTime filterStartDate, LocalDateTime now);
 }
 

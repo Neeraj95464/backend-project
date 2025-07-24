@@ -8,8 +8,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class ResolutionStats {
-    private Long avg;
-    private Long min;
-    private Long max;
+    private Double avg;
+    private Double min;
+    private Double max;
+    private Integer ticketCount;
     // constructor, getters
 }

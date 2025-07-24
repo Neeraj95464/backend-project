@@ -36,6 +36,8 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.time.temporal.ChronoField;
+import java.time.temporal.IsoFields;
+import java.time.temporal.TemporalAdjusters;
 import java.time.temporal.WeekFields;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -1152,44 +1154,137 @@ public class TicketService {
 //    }
 
 
+//    public ResolutionTimeStatsDTO getResolutionTimeStats() {
+//        List<Ticket> tickets = ticketRepository.findAll();
+//
+//        List<Ticket> validTickets = tickets.stream()
+//                .filter(t -> t.getCreatedAt() != null &&
+//                        t.getUpdatedAt() != null &&
+//                        t.getStatus() == TicketStatus.CLOSED &&
+//                        (t.getTicketDepartment() == null || t.getTicketDepartment() != TicketDepartment.HR))
+//                .collect(Collectors.toList());
+//
+//        Map<String, List<Long>> weekly = new HashMap<>();
+//        Map<String, List<Long>> monthly = new HashMap<>();
+//        List<Long> overall = new ArrayList<>();
+//
+//        for (Ticket t : validTickets) {
+//            long minutes = Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes();
+//            overall.add(minutes);
+//
+////            String weekKey = t.getCreatedAt().getYear() + "-W" + t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_YEAR);
+//            String monthAbbrev = t.getCreatedAt().getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH); // e.g. "Jul"
+//            int weekOfMonth = t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_MONTH); // e.g. 1, 2, 3...
+//            String weekKey = monthAbbrev + " W" + weekOfMonth; // e.g. "Jul W2"
+//
+//            weekly.computeIfAbsent(weekKey, k -> new ArrayList<>()).add(minutes);
+//
+//            String monthKey = t.getCreatedAt().getYear() + "-" + String.format("%02d", t.getCreatedAt().getMonthValue());
+//            monthly.computeIfAbsent(monthKey, k -> new ArrayList<>()).add(minutes);
+//        }
+//
+//        Map<String, ResolutionStats> limitedWeeklyStats = limitToMostRecentWeeks(weekly, 5);
+//        Map<String, ResolutionStats> limitedMonthlyStats = limitToMostRecentMonths(monthly, 4);
+//
+//        return new ResolutionTimeStatsDTO(
+//                calculateStats(overall),
+//                limitedWeeklyStats,
+//                limitedMonthlyStats
+//        );
+//    }
+
+
     public ResolutionTimeStatsDTO getResolutionTimeStats() {
         List<Ticket> tickets = ticketRepository.findAll();
 
+        // Only closed, non-HR, with valid timestamps
         List<Ticket> validTickets = tickets.stream()
-                .filter(t -> t.getCreatedAt() != null &&
-                        t.getUpdatedAt() != null &&
-                        t.getStatus() == TicketStatus.CLOSED &&
-                        (t.getTicketDepartment() == null || t.getTicketDepartment() != TicketDepartment.HR))
+                .filter(t -> t.getCreatedAt() != null
+                        && t.getUpdatedAt() != null
+                        && t.getStatus() == TicketStatus.CLOSED
+                        && (t.getTicketDepartment() == null || t.getTicketDepartment() != TicketDepartment.HR)
+                )
                 .collect(Collectors.toList());
 
-        Map<String, List<Long>> weekly = new HashMap<>();
-        Map<String, List<Long>> monthly = new HashMap<>();
+        // -- Prepare grouping --
+        Map<String, List<Long>> weekly = new LinkedHashMap<>();
+        Map<String, List<Long>> monthly = new LinkedHashMap<>();
         List<Long> overall = new ArrayList<>();
 
+        // For current month/week stats
+        LocalDate today = LocalDate.now();
+        int thisMonth = today.getMonthValue();
+        int thisYear = today.getYear();
+
+        // For 3 month window (including current)
+        LocalDate firstOfCurrentMonth = today.withDayOfMonth(1);
+        LocalDate firstOf3rdLastMonth = firstOfCurrentMonth.minusMonths(2);
+
         for (Ticket t : validTickets) {
-            long minutes = Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes();
+            LocalDateTime created = t.getCreatedAt();
+            long minutes = Duration.between(created, t.getUpdatedAt()).toMinutes();
             overall.add(minutes);
 
-//            String weekKey = t.getCreatedAt().getYear() + "-W" + t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_YEAR);
-            String monthAbbrev = t.getCreatedAt().getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH); // e.g. "Jul"
-            int weekOfMonth = t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_MONTH); // e.g. 1, 2, 3...
-            String weekKey = monthAbbrev + " W" + weekOfMonth; // e.g. "Jul W2"
+            // --- Weekly -- only current month, week starts at 1
+            if (created.getYear() == thisYear && created.getMonthValue() == thisMonth) {
+                String monthAbbrev = created.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+                int weekOfMonth = ((created.getDayOfMonth() - 1) / 7) + 1; // weeks start at 1
+                String weekKey = monthAbbrev + " W" + weekOfMonth;
+                weekly.computeIfAbsent(weekKey, k -> new ArrayList<>()).add(minutes);
+            }
 
-            weekly.computeIfAbsent(weekKey, k -> new ArrayList<>()).add(minutes);
-
-            String monthKey = t.getCreatedAt().getYear() + "-" + String.format("%02d", t.getCreatedAt().getMonthValue());
-            monthly.computeIfAbsent(monthKey, k -> new ArrayList<>()).add(minutes);
+            // --- Monthly: last 3 months (including current)
+            if (!created.toLocalDate().isBefore(firstOf3rdLastMonth)) {
+                String monthKey = created.getYear() + "-" + String.format("%02d", created.getMonthValue());
+                monthly.computeIfAbsent(monthKey, k -> new ArrayList<>()).add(minutes);
+            }
         }
 
-        Map<String, ResolutionStats> limitedWeeklyStats = limitToMostRecentWeeks(weekly, 5);
-        Map<String, ResolutionStats> limitedMonthlyStats = limitToMostRecentMonths(monthly, 4);
+        // --- Pad weeks: Always show all weeks up to this week in current month
+        int lastWeekIndex = ((today.getDayOfMonth() - 1) / 7) + 1;
+        String thisMonthAbbrev = today.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+        for (int i = 1; i <= lastWeekIndex; i++) {
+            String wkKey = thisMonthAbbrev + " W" + i;
+            weekly.putIfAbsent(wkKey, new ArrayList<>());
+        }
+
+        // --- Prepare output using improved stats with ticket count ---
+        Map<String, ResolutionStats> weeklyStats = weekly.entrySet().stream()
+                .sorted(Comparator.comparing(e -> Integer.parseInt(e.getKey().split(" W")[1])))
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> calculateStats(e.getValue()),
+                        (a, b) -> a, LinkedHashMap::new
+                ));
+
+        Map<String, ResolutionStats> monthlyStats = monthly.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(Comparator.reverseOrder()))
+                .limit(3)
+                .sorted(Map.Entry.comparingByKey())
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> calculateStats(e.getValue()),
+                        (a, b) -> a, LinkedHashMap::new
+                ));
 
         return new ResolutionTimeStatsDTO(
-                calculateStats(overall),
-                limitedWeeklyStats,
-                limitedMonthlyStats
+                calculateStats(overall), // all closed tickets except HR
+                weeklyStats,
+                monthlyStats
         );
     }
+
+    // Your improved stats method (in days, with count)
+//    public ResolutionStats calculateStats(List<Long> times) {
+//        int ticketCount = times.size();
+//        if (ticketCount == 0) return new ResolutionStats(null, null, null, 0);
+//
+//        Double min = times.stream().mapToLong(Long::longValue).min().orElse(0) / 1440.0;
+//        Double max = times.stream().mapToLong(Long::longValue).max().orElse(0) / 1440.0;
+//        Double avg = times.stream().mapToLong(Long::longValue).average().orElse(0) / 1440.0;
+//        return new ResolutionStats(avg, min, max, ticketCount);
+//    }
+
 
 
 //    public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
@@ -1232,171 +1327,524 @@ public class TicketService {
 //        return new ResolutionTimeStatsDTO(avg, min, max);
 //    }
 
-    public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
-        User user = userRepository.findByEmployeeId(assigneeId)
-                .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
-
-        List<Ticket> tickets = ticketRepository.findByAssignee(user);
-
-        // Only consider CLOSED tickets with valid timestamps
-        List<Ticket> closedTickets = tickets.stream()
-                .filter(t -> t.getStatus() == TicketStatus.CLOSED && t.getCreatedAt() != null && t.getUpdatedAt() != null)
-                .collect(Collectors.toList());
-
-        // Group by week
-        Map<String, List<Long>> weekly = new HashMap<>();
-        // Group by month
-        Map<String, List<Long>> monthly = new HashMap<>();
-        // Overall resolution times
-        List<Long> overall = new ArrayList<>();
-
-        for (Ticket t : closedTickets) {
-            long minutes = Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes();
-            overall.add(minutes);
-
-            // Weekly key: e.g., "2025-W29"
-//            String weekKey = t.getCreatedAt().getYear() + "-W" + t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_YEAR);
-            String monthAbbrev = t.getCreatedAt().getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH); // e.g. "Jul"
-            int weekOfMonth = t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_MONTH); // e.g. 1, 2, 3...
-            String weekKey = monthAbbrev + " W" + weekOfMonth; // e.g. "Jul W2"
-
-            weekly.computeIfAbsent(weekKey, k -> new ArrayList<>()).add(minutes);
-
-            // Monthly key: e.g., "2025-07"
-            String monthKey = t.getCreatedAt().getYear() + "-" + String.format("%02d", t.getCreatedAt().getMonthValue());
-            monthly.computeIfAbsent(monthKey, k -> new ArrayList<>()).add(minutes);
-        }
-
-        Map<String, ResolutionStats> limitedWeeklyStats = limitToMostRecentWeeks(weekly, 5);
-        Map<String, ResolutionStats> limitedMonthlyStats = limitToMostRecentMonths(monthly, 4);
-
-        return new ResolutionTimeStatsDTO(
-                calculateStats(overall),
-                limitedWeeklyStats,
-                limitedMonthlyStats
-        );
-    }
-
-    public ResolutionStats calculateStats(List<Long> times) {
-        if (times.isEmpty()) return new ResolutionStats(null, null, null);
-
-        long min = times.stream().mapToLong(Long::longValue).min().orElse(0);
-        long max = times.stream().mapToLong(Long::longValue).max().orElse(0);
-        long avg = (long) times.stream().mapToLong(Long::longValue).average().orElse(0);
-
-        return new ResolutionStats(avg, min, max);
-    }
-
-    public Map<String, ResolutionStats> calculateGroupedStats(Map<String, List<Long>> groupedTimes) {
-        return groupedTimes.entrySet().stream()
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        e -> calculateStats(e.getValue())
-                ));
-    }
-
-    private Map<String, ResolutionStats> limitToMostRecentWeeks(Map<String, List<Long>> weekly, int limit) {
-        return weekly.entrySet().stream()
-                .sorted((a, b) -> parseWeek(b.getKey()).compareTo(parseWeek(a.getKey()))) // Sort newest first
-                .limit(limit)
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        e -> calculateStats(e.getValue()),
-                        (e1, e2) -> e1,
-                        LinkedHashMap::new
-                ));
-    }
-
-    private Map<String, ResolutionStats> limitToMostRecentMonths(Map<String, List<Long>> monthly, int limit) {
-        return monthly.entrySet().stream()
-                .sorted((a, b) -> parseMonth(b.getKey()).compareTo(parseMonth(a.getKey()))) // Sort newest first
-                .limit(limit)
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        e -> calculateStats(e.getValue()),
-                        (e1, e2) -> e1,
-                        LinkedHashMap::new
-                ));
-    }
-
-    // Parses "2025-W29" into LocalDate of the Monday of that week
-//    private LocalDate parseWeek(String weekKey) {
-//        String[] parts = weekKey.split("-W");
-//        int year = Integer.parseInt(parts[0]);
-//        int week = Integer.parseInt(parts[1]);
-//        return LocalDate.ofYearDay(year, 1).with(ChronoField.ALIGNED_WEEK_OF_YEAR, week)
-//                .with(ChronoField.DAY_OF_WEEK, 1); // Monday
+//    public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
+//        User user = userRepository.findByEmployeeId(assigneeId)
+//                .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
+//
+//        List<Ticket> tickets = ticketRepository.findByAssignee(user);
+//
+//        // Only consider CLOSED tickets with valid timestamps
+//        List<Ticket> closedTickets = tickets.stream()
+//                .filter(t -> t.getStatus() == TicketStatus.CLOSED && t.getCreatedAt() != null && t.getUpdatedAt() != null)
+//                .collect(Collectors.toList());
+//
+//        // Group by week
+//        Map<String, List<Long>> weekly = new HashMap<>();
+//        // Group by month
+//        Map<String, List<Long>> monthly = new HashMap<>();
+//        // Overall resolution times
+//        List<Long> overall = new ArrayList<>();
+//
+//        for (Ticket t : closedTickets) {
+//            long minutes = Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes();
+//            overall.add(minutes);
+//
+//            // Weekly key: e.g., "2025-W29"
+////            String weekKey = t.getCreatedAt().getYear() + "-W" + t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_YEAR);
+//            String monthAbbrev = t.getCreatedAt().getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH); // e.g. "Jul"
+//            int weekOfMonth = t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_MONTH); // e.g. 1, 2, 3...
+//            String weekKey = monthAbbrev + " W" + weekOfMonth; // e.g. "Jul W2"
+//
+//            weekly.computeIfAbsent(weekKey, k -> new ArrayList<>()).add(minutes);
+//
+//            // Monthly key: e.g., "2025-07"
+//            String monthKey = t.getCreatedAt().getYear() + "-" + String.format("%02d", t.getCreatedAt().getMonthValue());
+//            monthly.computeIfAbsent(monthKey, k -> new ArrayList<>()).add(minutes);
+//        }
+//
+//        Map<String, ResolutionStats> limitedWeeklyStats = limitToMostRecentWeeks(weekly, 5);
+//        Map<String, ResolutionStats> limitedMonthlyStats = limitToMostRecentMonths(monthly, 4);
+//
+//        return new ResolutionTimeStatsDTO(
+//                calculateStats(overall),
+//                limitedWeeklyStats,
+//                limitedMonthlyStats
+//        );
+//    }
+//
+//    public ResolutionStats calculateStats(List<Long> times) {
+//        if (times.isEmpty()) return new ResolutionStats(null, null, null);
+//
+//        long min = times.stream().mapToLong(Long::longValue).min().orElse(0);
+//        long max = times.stream().mapToLong(Long::longValue).max().orElse(0);
+//        long avg = (long) times.stream().mapToLong(Long::longValue).average().orElse(0);
+//
+//        return new ResolutionStats(avg, min, max);
+//    }
+//
+//    public Map<String, ResolutionStats> calculateGroupedStats(Map<String, List<Long>> groupedTimes) {
+//        return groupedTimes.entrySet().stream()
+//                .collect(Collectors.toMap(
+//                        Map.Entry::getKey,
+//                        e -> calculateStats(e.getValue())
+//                ));
+//    }
+//
+//    private Map<String, ResolutionStats> limitToMostRecentWeeks(Map<String, List<Long>> weekly, int limit) {
+//        return weekly.entrySet().stream()
+//                .sorted((a, b) -> parseWeek(b.getKey()).compareTo(parseWeek(a.getKey()))) // Sort newest first
+//                .limit(limit)
+//                .collect(Collectors.toMap(
+//                        Map.Entry::getKey,
+//                        e -> calculateStats(e.getValue()),
+//                        (e1, e2) -> e1,
+//                        LinkedHashMap::new
+//                ));
+//    }
+//
+//    private Map<String, ResolutionStats> limitToMostRecentMonths(Map<String, List<Long>> monthly, int limit) {
+//        return monthly.entrySet().stream()
+//                .sorted((a, b) -> parseMonth(b.getKey()).compareTo(parseMonth(a.getKey()))) // Sort newest first
+//                .limit(limit)
+//                .collect(Collectors.toMap(
+//                        Map.Entry::getKey,
+//                        e -> calculateStats(e.getValue()),
+//                        (e1, e2) -> e1,
+//                        LinkedHashMap::new
+//                ));
 //    }
 
-    private LocalDate parseWeek(String weekKey) {
-        String[] parts = weekKey.split(" W");
-        String monthStr = parts[0];
-        int weekOfMonth = Integer.parseInt(parts[1]);
 
-        // Parse month name to Month enum
-        Month month = Month.from(DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH).parse(monthStr));
-
-        // Use current year or pass year separately if required
-        int year = LocalDate.now().getYear();
-
-        // Get first day of the month
-        LocalDate firstOfMonth = LocalDate.of(year, month, 1);
-
-        // Calculate start of desired week
-        WeekFields weekFields = WeekFields.ISO;
-        return firstOfMonth
-                .with(weekFields.weekOfMonth(), weekOfMonth)
-                .with(weekFields.dayOfWeek(), 1); // Monday
-    }
-
-
-
-    // Parses "2025-07" into LocalDate (1st of month)
-    private LocalDate parseMonth(String monthKey) {
-        return LocalDate.parse(monthKey + "-01");
-    }
-
-
-
-
-
-//    public List<TicketStatusTimeSeriesDTO> getTicketStatusOverTime() {
+//    private LocalDate parseWeek(String weekKey) {
+//        String[] parts = weekKey.split(" W");
+//        String monthStr = parts[0];
+//        int weekOfMonth = Integer.parseInt(parts[1]);
 //
-//        List<Ticket> tickets = ticketRepository.findAll();
-//        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-//        Map<String, Map<TicketStatus, Long>> dailyStatusMap = new TreeMap<>();
+//        // Parse month name to Month enum
+//        Month month = Month.from(DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH).parse(monthStr));
 //
-//        for (Ticket ticket : tickets) {
-//            if (ticket.getCreatedAt() != null && ticket.getStatus() != null) {
-//                String date = ticket.getCreatedAt().format(formatter);
-//                dailyStatusMap.putIfAbsent(date, new EnumMap<>(TicketStatus.class));
-//                Map<TicketStatus, Long> statusMap = dailyStatusMap.get(date);
-//                statusMap.put(ticket.getStatus(), statusMap.getOrDefault(ticket.getStatus(), 0L) + 1);
+//        // Use current year or pass year separately if required
+//        int year = LocalDate.now().getYear();
+//
+//        // Get first day of the month
+//        LocalDate firstOfMonth = LocalDate.of(year, month, 1);
+//
+//        // Calculate start of desired week
+//        WeekFields weekFields = WeekFields.ISO;
+//        return firstOfMonth
+//                .with(weekFields.weekOfMonth(), weekOfMonth)
+//                .with(weekFields.dayOfWeek(), 1); // Monday
+//    }
+
+
+//    private LocalDate parseWeek(String weekKey) {
+//        try {
+//            String[] parts = weekKey.split(" W");
+//            if (parts.length != 2) throw new IllegalArgumentException("Invalid weekKey: " + weekKey);
+//            String monthStr = parts[0].trim();
+//            int weekOfMonth = Integer.parseInt(parts[1].trim());
+//
+//            // Parse month name
+//            Month month = Month.from(DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH).parse(monthStr));
+//
+//            // Caution: Always using current year can break with historical/future data!
+//            // If your key doesn't include the year, you could pass 'year' separately as a parameter.
+//
+//            int year = LocalDate.now().getYear(); // Or pass as argument for better correctness
+//
+//            LocalDate firstOfMonth = LocalDate.of(year, month, 1);
+//
+//            WeekFields weekFields = WeekFields.ISO;
+//            return firstOfMonth
+//                    .with(weekFields.weekOfMonth(), weekOfMonth)
+//                    .with(weekFields.dayOfWeek(), 1); // Monday
+//        } catch (Exception e) {
+//            System.err.println("Bad weekKey: " + weekKey + " Exception: " + e.getMessage());
+//            return LocalDate.MIN;
+//        }
+//    }
+//
+//
+//    // Parses "2025-07" into LocalDate (1st of month)
+////    private LocalDate parseMonth(String monthKey) {
+////        return LocalDate.parse(monthKey + "-01");
+////    }
+//
+//
+//        public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
+//            User user = userRepository.findByEmployeeId(assigneeId)
+//                    .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
+//
+//            LocalDateTime startDateWeeks = getStartOfRecentWeeks(5);
+//            LocalDateTime startDateMonths = getStartOfRecentMonths(4);
+//
+//            // Use the earlier start date to cover both windows
+//            LocalDateTime filterStartDate = startDateWeeks.isBefore(startDateMonths) ? startDateWeeks : startDateMonths;
+//
+//            List<Ticket> tickets = ticketRepository.findByAssigneeAndCreatedAtBetween(user, filterStartDate, LocalDateTime.now());
+//
+//            List<Ticket> closedTickets = tickets.stream()
+//                    .filter(t -> t.getStatus() == TicketStatus.CLOSED && t.getCreatedAt() != null && t.getUpdatedAt() != null)
+//                    .collect(Collectors.toList());
+//
+//            Map<String, List<Long>> weekly = new HashMap<>();
+//            Map<String, List<Long>> monthly = new HashMap<>();
+//            List<Long> overall = new ArrayList<>();
+//
+//            for (Ticket t : closedTickets) {
+//                long minutes = Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes();
+//                overall.add(minutes);
+//
+//                // Group by ISO year and week number e.g. "2025-W29"
+//                int weekOfYear = t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_YEAR);
+//                int year = t.getCreatedAt().getYear();
+//
+//                String monthAbbrev = t.getCreatedAt().getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH); // e.g. "Jul"
+//            int weekOfMonth = t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_MONTH); // e.g. 1, 2, 3...
+//            String weekKey = monthAbbrev + " W" + weekOfMonth;
+////                String weekKey = year + "-W" + String.format("%02d", weekOfYear);
+//                weekly.computeIfAbsent(weekKey, k -> new ArrayList<>()).add(minutes);
+//
+//                // Monthly key: "2025-07"
+//                String monthKey = t.getCreatedAt().getYear() + "-" + String.format("%02d", t.getCreatedAt().getMonthValue());
+//                monthly.computeIfAbsent(monthKey, k -> new ArrayList<>()).add(minutes);
+//            }
+//
+//            Map<String, ResolutionStats> limitedWeeklyStats = limitToMostRecentWeeks(weekly, 5);
+//            Map<String, ResolutionStats> limitedMonthlyStats = limitToMostRecentMonths(monthly, 4);
+//
+//            return new ResolutionTimeStatsDTO(
+//                    calculateStats(overall),
+//                    limitedWeeklyStats,
+//                    limitedMonthlyStats
+//            );
+//        }
+//
+//        private LocalDateTime getStartOfRecentWeeks(int weeksBack) {
+//            LocalDate now = LocalDate.now();
+//            // Subtract weeksBack-1 weeks and get Monday of that week
+//            LocalDate startOfWeek = now.minusWeeks(weeksBack - 1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+//            return startOfWeek.atStartOfDay();
+//        }
+//
+//        private LocalDateTime getStartOfRecentMonths(int monthsBack) {
+//            LocalDate now = LocalDate.now();
+//            LocalDate startOfMonth = now.minusMonths(monthsBack - 1).withDayOfMonth(1);
+//            return startOfMonth.atStartOfDay();
+//        }
+//
+//
+//    public ResolutionStats calculateStats(List<Long> times) {
+//        if (times.isEmpty()) return new ResolutionStats(null, null, null);
+//
+//        // Convert minutes to days (double, keep fraction)
+//        Double min = times.stream().mapToLong(Long::longValue).min().orElse(0) / 1440.0;
+//        Double max = times.stream().mapToLong(Long::longValue).max().orElse(0) / 1440.0;
+//        Double avg = times.stream().mapToLong(Long::longValue).average().orElse(0) / 1440.0;
+//
+//        return new ResolutionStats(avg, min, max);
+//    }
+//
+//
+//    private Map<String, ResolutionStats> limitToMostRecentWeeks(Map<String, List<Long>> weekly, int limit) {
+//            return weekly.entrySet().stream()
+//                    // Sort keys (e.g. "2025-W29") by year and week descending (newest first)
+//                    .sorted((a, b) -> parseWeek(b.getKey()).compareTo(parseWeek(a.getKey())))
+//                    .limit(limit)
+//                    .collect(Collectors.toMap(
+//                            Map.Entry::getKey,
+//                            e -> calculateStats(e.getValue()),
+//                            (e1, e2) -> e1,
+//                            LinkedHashMap::new
+//                    ));
+//        }
+//
+//        private Map<String, ResolutionStats> limitToMostRecentMonths(Map<String, List<Long>> monthly, int limit) {
+//            return monthly.entrySet().stream()
+//                    // Sort by month descending
+//                    .sorted((a, b) -> parseMonth(b.getKey()).compareTo(parseMonth(a.getKey())))
+//                    .limit(limit)
+//                    .collect(Collectors.toMap(
+//                            Map.Entry::getKey,
+//                            e -> calculateStats(e.getValue()),
+//                            (e1, e2) -> e1,
+//                            LinkedHashMap::new
+//                    ));
+//        }
+//
+//
+//        // Parses "2025-07" into LocalDate (1st day of month)
+//        private LocalDate parseMonth(String monthKey) {
+//            return LocalDate.parse(monthKey + "-01");
+//        }
+
+
+//        public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
+//            User user = userRepository.findByEmployeeId(assigneeId)
+//                    .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
+//
+//            // --- Filter for tickets in current month only, up to today ---
+//            LocalDate today = LocalDate.now();
+//            LocalDate firstOfMonth = today.withDayOfMonth(1);
+//            LocalDateTime monthStart = firstOfMonth.atStartOfDay();
+//            LocalDateTime monthEnd = today.atTime(LocalTime.MAX);
+//
+//            List<Ticket> tickets = ticketRepository.findByAssigneeAndCreatedAtBetween(
+//                    user, monthStart, monthEnd
+//            );
+//
+//            List<Ticket> allTicketList= ticketRepository.findByAssignee(user);
+//
+//            // Only closed tickets with valid timestamps
+//            List<Ticket> closedTickets = allTicketList.stream()
+//                    .filter(t -> t.getStatus() == TicketStatus.CLOSED && t.getCreatedAt() != null && t.getUpdatedAt() != null)
+//                    .collect(Collectors.toList());
+//
+//            // Grouping
+//            Map<String, List<Long>> weekly = new LinkedHashMap<>();
+//            Map<String, List<Long>> monthly = new LinkedHashMap<>();
+//            List<Long> overall = new ArrayList<>();
+//
+//            // Get current month/year for grouping consistency
+//            int thisMonth = today.getMonthValue();
+//            int thisYear = today.getYear();
+//
+//            for (Ticket t : closedTickets) {
+//                LocalDateTime created = t.getCreatedAt();
+//                long minutes = Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes();
+//                overall.add(minutes);
+//
+//                // Week key: "Jul W0", "Jul W1" etc -- for current month only
+//                if (created.getMonthValue() == thisMonth && created.getYear() == thisYear) {
+//                    String monthAbbrev = created.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+//                    int weekOfMonth = (created.getDayOfMonth() - 1) / 7;
+//                    String weekKey = monthAbbrev + " W" + weekOfMonth;
+//                    weekly.computeIfAbsent(weekKey, k -> new ArrayList<>()).add(minutes);
+//                }
+//
+//                // Month key: "2025-07"
+//                String monthKey = created.getYear() + "-" + String.format("%02d", created.getMonthValue());
+//                monthly.computeIfAbsent(monthKey, k -> new ArrayList<>()).add(minutes);
+//            }
+//
+//            // Only current month's weekly stats, already filtered in loop above
+//            Map<String, ResolutionStats> weeklyStats = calculateGroupedStats(weekly);
+//            // Only current month in monthly stats, so limit =1
+//            Map<String, ResolutionStats> monthlyStats = calculateGroupedStats(monthly).entrySet().stream()
+//                    .filter(e -> e.getKey().equals(thisYear + "-" + String.format("%02d", thisMonth)))
+//                    .collect(Collectors.toMap(
+//                            Map.Entry::getKey, Map.Entry::getValue,
+//                            (a, b) -> a, LinkedHashMap::new
+//                    ));
+//
+//            return new ResolutionTimeStatsDTO(
+//                    calculateStats(overall),
+//                    weeklyStats,
+//                    monthlyStats
+//            );
+//        }
+//
+//        // Defensive week parser for "Jul W0" type keys
+//        private LocalDate parseWeek(String weekKey) {
+//            try {
+//                String[] parts = weekKey.split(" W");
+//                if (parts.length != 2)
+//                    throw new IllegalArgumentException("Invalid weekKey: " + weekKey);
+//                String monthStr = parts[0].trim();
+//                int weekOfMonth = Integer.parseInt(parts[1].trim());
+//
+//                Month month = Month.from(DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH).parse(monthStr));
+//                int year = LocalDate.now().getYear(); // all data is for current month/year
+//                LocalDate firstOfMonth = LocalDate.of(year, month, 1);
+//                // Start of week = firstOfMonth + weekOfMonth*7
+//                return firstOfMonth.plusDays(weekOfMonth * 7L);
+//            } catch (Exception e) {
+//                System.err.println("Bad weekKey: " + weekKey + " Exception: " + e.getMessage());
+//                return LocalDate.MIN;
 //            }
 //        }
 //
-//        List<TicketStatusTimeSeriesDTO> series = new ArrayList<>();
-//        for (Map.Entry<String, Map<TicketStatus, Long>> entry : dailyStatusMap.entrySet()) {
-//            series.add(new TicketStatusTimeSeriesDTO(entry.getKey(), entry.getValue()));
+//        // Defensive month parser for "2025-07" format
+//        private LocalDate parseMonth(String monthKey) {
+//            try {
+//                return LocalDate.parse(monthKey + "-01");
+//            } catch (Exception e) {
+//                System.err.println("Bad monthKey: " + monthKey + " Exception: " + e.getMessage());
+//                return LocalDate.MIN;
+//            }
 //        }
 //
-//        return series;
-//    }
-
-//    public Map<String, Long> getTopTicketReporters() {
-//        ZoneId zone = ZoneId.of("Asia/Kolkata");
-//        LocalDate today = LocalDate.now(zone);
-//        LocalDate startDate = today.minusDays(29);
-//        LocalDateTime startOfDay = startDate.atStartOfDay();
-//        LocalDateTime endOfToday = today.atTime(LocalTime.MAX);
+//        // Groups keys already filtered for current month; so just sort for stable order
+//        private Map<String, ResolutionStats> calculateGroupedStats(Map<String, List<Long>> groupedTimes) {
+//            // keys are either "Jul Wn" (for weekly) or "YYYY-MM" (for monthly)
+//            return groupedTimes.entrySet().stream()
+//                    .sorted(Comparator.comparing(Map.Entry::getKey))
+//                    .collect(Collectors.toMap(
+//                            Map.Entry::getKey,
+//                            e -> calculateStats(e.getValue()),
+//                            (e1, e2) -> e1,
+//                            LinkedHashMap::new
+//                    ));
+//        }
 //
-//        List<Ticket> tickets = ticketRepository.findTicketsCreatedBetween(startOfDay,endOfToday);
-//        return tickets.stream()
-//                .collect(Collectors.groupingBy(
-//                        t -> t.getEmployee() != null ? t.getEmployee().getUsername() : "Unknown",
-//                        Collectors.counting()
-//                ));
-//    }
+//        public ResolutionStats calculateStats(List<Long> times) {
+//            if (times.isEmpty()) return new ResolutionStats(null, null, null);
+//
+//            // Convert minutes to days (as Double, fractional)
+//            Double min = times.stream().mapToLong(Long::longValue).min().orElse(0) / 1440.0;
+//            Double max = times.stream().mapToLong(Long::longValue).max().orElse(0) / 1440.0;
+//            Double avg = times.stream().mapToLong(Long::longValue).average().orElse(0) / 1440.0;
+//            return new ResolutionStats(avg, min, max);
+//        }
+//
+//        // Reused if needed, but for current logic not called in main path
+//        private LocalDateTime getStartOfRecentWeeks(int weeksBack) {
+//            LocalDate now = LocalDate.now();
+//            LocalDate startOfWeek = now.minusWeeks(weeksBack - 1).with(DayOfWeek.MONDAY);
+//            return startOfWeek.atStartOfDay();
+//        }
+//
+//        private LocalDateTime getStartOfRecentMonths(int monthsBack) {
+//            LocalDate now = LocalDate.now();
+//            LocalDate startOfMonth = now.minusMonths(monthsBack - 1).withDayOfMonth(1);
+//            return startOfMonth.atStartOfDay();
+//        }
+
+
+
+        public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
+            User user = userRepository.findByEmployeeId(assigneeId)
+                    .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
+            LocalDate today = LocalDate.now();
+            LocalDate firstOfCurrentMonth = today.withDayOfMonth(1);
+            LocalDate firstOf3rdLastMonth = firstOfCurrentMonth.minusMonths(2);
+
+            // For monthly and weekly, use tickets from last 3 months
+            List<Ticket> recentTickets = ticketRepository.findByAssigneeAndCreatedAtBetween(
+                    user, firstOf3rdLastMonth.atStartOfDay(), today.atTime(LocalTime.MAX)
+            );
+            // For overall, use ALL tickets ever
+            List<Ticket> allTickets = ticketRepository.findByAssignee(user);
+
+            // Only closed tickets with valid createdAt and updatedAt
+            List<Ticket> closedTicketsAllTime = allTickets.stream()
+                    .filter(t -> t.getStatus() == TicketStatus.CLOSED &&
+                            t.getCreatedAt() != null && t.getUpdatedAt() != null)
+                    .collect(Collectors.toList());
+
+            List<Ticket> closedTickets3Months = recentTickets.stream()
+                    .filter(t -> t.getStatus() == TicketStatus.CLOSED &&
+                            t.getCreatedAt() != null && t.getUpdatedAt() != null)
+                    .collect(Collectors.toList());
+
+            // --- Overall Stats (all time) ---
+            List<Long> allClosedDurations = closedTicketsAllTime.stream()
+                    .map(t -> Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
+                    .collect(Collectors.toList());
+
+            // --- Month and Week Stats ---
+            Map<String, List<Long>> monthly = new LinkedHashMap<>();
+            Map<String, List<Long>> weekly = new LinkedHashMap<>();
+
+            int thisMonth = today.getMonthValue();
+            int thisYear = today.getYear();
+
+            for (Ticket t : closedTickets3Months) {
+                LocalDateTime created = t.getCreatedAt();
+                long minutes = Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes();
+
+                // --- Monthly ---
+                String monthKey = created.getYear() + "-" + String.format("%02d", created.getMonthValue());
+                monthly.computeIfAbsent(monthKey, k -> new ArrayList<>()).add(minutes);
+
+                // --- Weekly ---
+                if (created.getYear() == thisYear && created.getMonthValue() == thisMonth) {
+                    String monthAbbrev = created.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+                    int weekOfMonth = ((created.getDayOfMonth() - 1) / 7) + 1;  // Weeks start at 1!
+                    String weekKey = monthAbbrev + " W" + weekOfMonth;
+                    weekly.computeIfAbsent(weekKey, k -> new ArrayList<>()).add(minutes);
+                }
+            }
+
+            // --- Only the latest 3 months for monthly stats ---
+            Map<String, ResolutionStats> monthlyStats = monthly.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey(Comparator.reverseOrder()))
+                    .limit(3)
+                    .sorted(Map.Entry.comparingByKey()) // Oldest first
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            e -> calculateStats(e.getValue()),
+                            (a, b) -> a, LinkedHashMap::new
+                    ));
+
+            // --- Weekly stats: pad all weeks of current month, so W1...Wn always present ---
+            Map<String, ResolutionStats> weeklyStats = calculateGroupedStats(weekly);
+            // Figure out which is the last week number this month (for today)
+            int lastWeekIndex = ((today.getDayOfMonth() - 1) / 7) + 1;
+            String monthAbbrev = today.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+            for (int i = 1; i <= lastWeekIndex; i++) {
+                String weekKey = monthAbbrev + " W" + i;
+                weeklyStats.putIfAbsent(weekKey, new ResolutionStats(null, null, null, 0));
+            }
+
+            // Ensure week keys are sorted ascending
+            weeklyStats = weeklyStats.entrySet().stream()
+                    .sorted(Comparator.comparing(e -> Integer.parseInt(e.getKey().split(" W")[1])))
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            Map.Entry::getValue,
+                            (a,b)->a, LinkedHashMap::new
+                    ));
+
+            return new ResolutionTimeStatsDTO(
+                    calculateStats(allClosedDurations),
+                    weeklyStats,
+                    monthlyStats
+            );
+        }
+
+        // Used for grouped stats
+        private Map<String, ResolutionStats> calculateGroupedStats(Map<String, List<Long>> groupedTimes) {
+            return groupedTimes.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            e -> calculateStats(e.getValue()),
+                            (a, b) -> a, LinkedHashMap::new
+                    ));
+        }
+
+        public ResolutionStats calculateStats(List<Long> times) {
+            int ticketCount = times.size();
+            if (ticketCount == 0) return new ResolutionStats(null, null, null, 0);
+
+            Double min = times.stream().mapToLong(Long::longValue).min().orElse(0) / 1440.0;
+            Double max = times.stream().mapToLong(Long::longValue).max().orElse(0) / 1440.0;
+            Double avg = times.stream().mapToLong(Long::longValue).average().orElse(0) / 1440.0;
+            return new ResolutionStats(avg, min, max, ticketCount);
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     public Map<String, Long> getTicketCountByAssignee() {
         ZoneId zone = ZoneId.of("Asia/Kolkata");
