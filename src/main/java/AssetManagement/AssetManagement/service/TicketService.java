@@ -34,6 +34,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
+import java.time.temporal.ChronoField;
+import java.time.temporal.WeekFields;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1132,20 +1135,60 @@ public class TicketService {
 
 
 
+//    public ResolutionTimeStatsDTO getResolutionTimeStats() {
+//        List<Ticket> tickets = ticketRepository.findAll();
+//
+//        List<Long> resolutionTimes = tickets.stream()
+//                .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null &&
+//                        (t.getStatus() == TicketStatus.CLOSED))
+//                .map(t -> java.time.Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
+//                .collect(Collectors.toList());
+//
+//        long avg = (long) resolutionTimes.stream().mapToLong(Long::longValue).average().orElse(0);
+//        long min = resolutionTimes.stream().mapToLong(Long::longValue).min().orElse(0);
+//        long max = resolutionTimes.stream().mapToLong(Long::longValue).max().orElse(0);
+//
+//        return new ResolutionTimeStatsDTO(avg, min, max);
+//    }
+
+
     public ResolutionTimeStatsDTO getResolutionTimeStats() {
         List<Ticket> tickets = ticketRepository.findAll();
 
-        List<Long> resolutionTimes = tickets.stream()
-                .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null &&
-                        (t.getStatus() == TicketStatus.CLOSED))
-                .map(t -> java.time.Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
+        List<Ticket> validTickets = tickets.stream()
+                .filter(t -> t.getCreatedAt() != null &&
+                        t.getUpdatedAt() != null &&
+                        t.getStatus() == TicketStatus.CLOSED &&
+                        (t.getTicketDepartment() == null || t.getTicketDepartment() != TicketDepartment.HR))
                 .collect(Collectors.toList());
 
-        long avg = (long) resolutionTimes.stream().mapToLong(Long::longValue).average().orElse(0);
-        long min = resolutionTimes.stream().mapToLong(Long::longValue).min().orElse(0);
-        long max = resolutionTimes.stream().mapToLong(Long::longValue).max().orElse(0);
+        Map<String, List<Long>> weekly = new HashMap<>();
+        Map<String, List<Long>> monthly = new HashMap<>();
+        List<Long> overall = new ArrayList<>();
 
-        return new ResolutionTimeStatsDTO(avg, min, max);
+        for (Ticket t : validTickets) {
+            long minutes = Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes();
+            overall.add(minutes);
+
+//            String weekKey = t.getCreatedAt().getYear() + "-W" + t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_YEAR);
+            String monthAbbrev = t.getCreatedAt().getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH); // e.g. "Jul"
+            int weekOfMonth = t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_MONTH); // e.g. 1, 2, 3...
+            String weekKey = monthAbbrev + " W" + weekOfMonth; // e.g. "Jul W2"
+
+            weekly.computeIfAbsent(weekKey, k -> new ArrayList<>()).add(minutes);
+
+            String monthKey = t.getCreatedAt().getYear() + "-" + String.format("%02d", t.getCreatedAt().getMonthValue());
+            monthly.computeIfAbsent(monthKey, k -> new ArrayList<>()).add(minutes);
+        }
+
+        Map<String, ResolutionStats> limitedWeeklyStats = limitToMostRecentWeeks(weekly, 5);
+        Map<String, ResolutionStats> limitedMonthlyStats = limitToMostRecentMonths(monthly, 4);
+
+        return new ResolutionTimeStatsDTO(
+                calculateStats(overall),
+                limitedWeeklyStats,
+                limitedMonthlyStats
+        );
     }
 
 
@@ -1167,27 +1210,153 @@ public class TicketService {
 //        return new ResolutionTimeStatsDTO(avg, min, max); // still in minutes
 //    }
 
+//    public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
+//        User user = userRepository.findByEmployeeId(assigneeId)
+//                .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
+//
+//        List<Ticket> tickets = ticketRepository.findByAssignee(user);
+//
+//        List<Long> resolutionTimesInMinutes = tickets.stream()
+//                .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null && t.getStatus() == TicketStatus.CLOSED)
+//                .map(t -> Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
+//                .collect(Collectors.toList());
+//
+//        if (resolutionTimesInMinutes.isEmpty()) {
+//            return new ResolutionTimeStatsDTO(null, null, null); // or use -1 for all if nulls are not acceptable
+//        }
+//
+//        long avg = (long) resolutionTimesInMinutes.stream().mapToLong(Long::longValue).average().orElse(0);
+//        long min = resolutionTimesInMinutes.stream().mapToLong(Long::longValue).min().orElse(0);
+//        long max = resolutionTimesInMinutes.stream().mapToLong(Long::longValue).max().orElse(0);
+//
+//        return new ResolutionTimeStatsDTO(avg, min, max);
+//    }
+
     public ResolutionTimeStatsDTO getAssigneeResolutionStats(String assigneeId) {
         User user = userRepository.findByEmployeeId(assigneeId)
                 .orElseThrow(() -> new UserNotFoundException("User not found with employee ID: " + assigneeId));
 
         List<Ticket> tickets = ticketRepository.findByAssignee(user);
 
-        List<Long> resolutionTimesInMinutes = tickets.stream()
-                .filter(t -> t.getCreatedAt() != null && t.getUpdatedAt() != null && t.getStatus() == TicketStatus.CLOSED)
-                .map(t -> Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes())
+        // Only consider CLOSED tickets with valid timestamps
+        List<Ticket> closedTickets = tickets.stream()
+                .filter(t -> t.getStatus() == TicketStatus.CLOSED && t.getCreatedAt() != null && t.getUpdatedAt() != null)
                 .collect(Collectors.toList());
 
-        if (resolutionTimesInMinutes.isEmpty()) {
-            return new ResolutionTimeStatsDTO(null, null, null); // or use -1 for all if nulls are not acceptable
+        // Group by week
+        Map<String, List<Long>> weekly = new HashMap<>();
+        // Group by month
+        Map<String, List<Long>> monthly = new HashMap<>();
+        // Overall resolution times
+        List<Long> overall = new ArrayList<>();
+
+        for (Ticket t : closedTickets) {
+            long minutes = Duration.between(t.getCreatedAt(), t.getUpdatedAt()).toMinutes();
+            overall.add(minutes);
+
+            // Weekly key: e.g., "2025-W29"
+//            String weekKey = t.getCreatedAt().getYear() + "-W" + t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_YEAR);
+            String monthAbbrev = t.getCreatedAt().getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH); // e.g. "Jul"
+            int weekOfMonth = t.getCreatedAt().get(ChronoField.ALIGNED_WEEK_OF_MONTH); // e.g. 1, 2, 3...
+            String weekKey = monthAbbrev + " W" + weekOfMonth; // e.g. "Jul W2"
+
+            weekly.computeIfAbsent(weekKey, k -> new ArrayList<>()).add(minutes);
+
+            // Monthly key: e.g., "2025-07"
+            String monthKey = t.getCreatedAt().getYear() + "-" + String.format("%02d", t.getCreatedAt().getMonthValue());
+            monthly.computeIfAbsent(monthKey, k -> new ArrayList<>()).add(minutes);
         }
 
-        long avg = (long) resolutionTimesInMinutes.stream().mapToLong(Long::longValue).average().orElse(0);
-        long min = resolutionTimesInMinutes.stream().mapToLong(Long::longValue).min().orElse(0);
-        long max = resolutionTimesInMinutes.stream().mapToLong(Long::longValue).max().orElse(0);
+        Map<String, ResolutionStats> limitedWeeklyStats = limitToMostRecentWeeks(weekly, 5);
+        Map<String, ResolutionStats> limitedMonthlyStats = limitToMostRecentMonths(monthly, 4);
 
-        return new ResolutionTimeStatsDTO(avg, min, max);
+        return new ResolutionTimeStatsDTO(
+                calculateStats(overall),
+                limitedWeeklyStats,
+                limitedMonthlyStats
+        );
     }
+
+    public ResolutionStats calculateStats(List<Long> times) {
+        if (times.isEmpty()) return new ResolutionStats(null, null, null);
+
+        long min = times.stream().mapToLong(Long::longValue).min().orElse(0);
+        long max = times.stream().mapToLong(Long::longValue).max().orElse(0);
+        long avg = (long) times.stream().mapToLong(Long::longValue).average().orElse(0);
+
+        return new ResolutionStats(avg, min, max);
+    }
+
+    public Map<String, ResolutionStats> calculateGroupedStats(Map<String, List<Long>> groupedTimes) {
+        return groupedTimes.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> calculateStats(e.getValue())
+                ));
+    }
+
+    private Map<String, ResolutionStats> limitToMostRecentWeeks(Map<String, List<Long>> weekly, int limit) {
+        return weekly.entrySet().stream()
+                .sorted((a, b) -> parseWeek(b.getKey()).compareTo(parseWeek(a.getKey()))) // Sort newest first
+                .limit(limit)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> calculateStats(e.getValue()),
+                        (e1, e2) -> e1,
+                        LinkedHashMap::new
+                ));
+    }
+
+    private Map<String, ResolutionStats> limitToMostRecentMonths(Map<String, List<Long>> monthly, int limit) {
+        return monthly.entrySet().stream()
+                .sorted((a, b) -> parseMonth(b.getKey()).compareTo(parseMonth(a.getKey()))) // Sort newest first
+                .limit(limit)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> calculateStats(e.getValue()),
+                        (e1, e2) -> e1,
+                        LinkedHashMap::new
+                ));
+    }
+
+    // Parses "2025-W29" into LocalDate of the Monday of that week
+//    private LocalDate parseWeek(String weekKey) {
+//        String[] parts = weekKey.split("-W");
+//        int year = Integer.parseInt(parts[0]);
+//        int week = Integer.parseInt(parts[1]);
+//        return LocalDate.ofYearDay(year, 1).with(ChronoField.ALIGNED_WEEK_OF_YEAR, week)
+//                .with(ChronoField.DAY_OF_WEEK, 1); // Monday
+//    }
+
+    private LocalDate parseWeek(String weekKey) {
+        String[] parts = weekKey.split(" W");
+        String monthStr = parts[0];
+        int weekOfMonth = Integer.parseInt(parts[1]);
+
+        // Parse month name to Month enum
+        Month month = Month.from(DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH).parse(monthStr));
+
+        // Use current year or pass year separately if required
+        int year = LocalDate.now().getYear();
+
+        // Get first day of the month
+        LocalDate firstOfMonth = LocalDate.of(year, month, 1);
+
+        // Calculate start of desired week
+        WeekFields weekFields = WeekFields.ISO;
+        return firstOfMonth
+                .with(weekFields.weekOfMonth(), weekOfMonth)
+                .with(weekFields.dayOfWeek(), 1); // Monday
+    }
+
+
+
+    // Parses "2025-07" into LocalDate (1st of month)
+    private LocalDate parseMonth(String monthKey) {
+        return LocalDate.parse(monthKey + "-01");
+    }
+
+
 
 
 

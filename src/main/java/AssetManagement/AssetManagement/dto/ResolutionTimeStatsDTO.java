@@ -4,21 +4,18 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
+
 @NoArgsConstructor
 @Data
+@AllArgsConstructor
 public class ResolutionTimeStatsDTO {
-    private Long avgResolutionTimeInMinutes;
-    private Long minResolutionTimeInMinutes;
-    private Long maxResolutionTimeInMinutes;
-
-    public ResolutionTimeStatsDTO(Long avg, Long min, Long max) {
-        this.avgResolutionTimeInMinutes = avg;
-        this.minResolutionTimeInMinutes = min;
-        this.maxResolutionTimeInMinutes = max;
-    }
-
-    // Getters, setters, etc.
+    private ResolutionStats overall;
+    private Map<String, ResolutionStats> weekly;
+    private Map<String, ResolutionStats> monthly;
+    // constructor, getters
 }
+
 
 
 

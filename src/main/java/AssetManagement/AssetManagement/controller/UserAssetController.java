@@ -477,10 +477,8 @@ public class UserAssetController {
 
     @GetMapping("/tickets/stats/resolution/assignee/{employeeId}")
     public ResolutionTimeStatsDTO getResolutionStatsByAssignee(@PathVariable String employeeId) {
-//        System.out.println("Request came with employee id "+employeeId);
-        ResolutionTimeStatsDTO stats = ticketService.getAssigneeResolutionStats(employeeId);
-//        System.out.println("stats is "+ stats);
-        return stats;
+
+        return ticketService.getAssigneeResolutionStats(employeeId);
     }
 
     @GetMapping("/tickets/stats/top-reporters")
