@@ -4,28 +4,44 @@ import AssetManagement.AssetManagement.dto.*;
 import AssetManagement.AssetManagement.entity.Asset;
 import AssetManagement.AssetManagement.entity.AssetHistory;
 import AssetManagement.AssetManagement.enums.AssetStatus;
+import AssetManagement.AssetManagement.enums.AssetType;
+import AssetManagement.AssetManagement.enums.Department;
 import AssetManagement.AssetManagement.exception.AssetNotFoundException;
 import AssetManagement.AssetManagement.repository.AssetHistoryRepository;
 import AssetManagement.AssetManagement.repository.AssetRepository;
 import AssetManagement.AssetManagement.service.AssetService;
+import AssetManagement.AssetManagement.util.AssetSpecification;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.List;
 
 @RestController
 @Slf4j
 @RequestMapping("/api/assets")
-//@CrossOrigin(origins = "http://localhost:5173/")
 public class AssetController {
 
     private final AssetService assetService;
@@ -38,15 +54,131 @@ public class AssetController {
         this.assetRepository = assetRepository;
     }
 
-    @GetMapping
-    public ResponseEntity<List<AssetDTO>> getAllAssets() {
-        try {
-            List<AssetDTO> assets = assetService.getAllAssets();
-            return ResponseEntity.ok(assets);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+//    @GetMapping
+//    public ResponseEntity<List<AssetDTO>> getAllAssets() {
+//        try {
+//            List<AssetDTO> assets = assetService.getAllAssets();
+//            return ResponseEntity.ok(assets);
+//        } catch (Exception e) {
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+//        }
+//    }
+@GetMapping
+public ResponseEntity<PaginatedResponse<AssetDTO>> getAllAssets(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(defaultValue = "id,asc") String[] sort) {
+    try {
+        // Extract sort field and direction
+        String sortField = sort[0];
+        String sortDirection = sort.length > 1 ? sort[1] : "asc";
+
+        Sort.Direction direction = sortDirection.equalsIgnoreCase("desc")
+                ? Sort.Direction.DESC
+                : Sort.Direction.ASC;
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+
+        PaginatedResponse<AssetDTO> assets = assetService.getAllAssets(pageable);
+        return ResponseEntity.ok(assets);
+
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
+}
+
+
+//    @GetMapping("/filter")
+//    public Page<AssetDTO> filterAssets(
+//            @RequestParam(required = false) AssetStatus status,
+//            @RequestParam(required = false) AssetType type,
+//            @RequestParam(required = false) Department department,
+//            @RequestParam(required = false) String createdBy,
+//            @RequestParam(required = false) Long siteId,
+//            @RequestParam(required = false) Long locationId,
+//            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate purchaseStart,
+//            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate purchaseEnd,
+//            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdStart,
+//            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdEnd,
+//            @RequestParam(required = false) String keyword,
+//            @RequestParam(defaultValue = "0") int page,
+//            @RequestParam(defaultValue = "10") int size
+//    ) {
+//        return assetService.filterAssets(
+//                status, type, department,
+//                createdBy, siteId, locationId,
+//                purchaseStart, purchaseEnd,
+//                createdStart, createdEnd,
+//                keyword, page, size
+//        );
+//    }
+
+
+    @GetMapping("/filter")
+    public PaginatedResponse<AssetDTO> filterAssets(
+            @RequestParam(required = false) AssetStatus status,
+            @RequestParam(required = false) AssetType type,
+            @RequestParam(required = false) Department department,
+            @RequestParam(required = false) String createdBy,
+            @RequestParam(required = false) Long siteId,
+            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate purchaseStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate purchaseEnd,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdEnd,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        Page<AssetDTO> assetsPage = assetService.filterAssets(
+                status, type, department,
+                createdBy, siteId, locationId,
+                purchaseStart, purchaseEnd,
+                createdStart, createdEnd,
+                keyword, page, size
+        );
+
+        return new PaginatedResponse<>(
+                assetsPage.getContent(),
+                assetsPage.getNumber(),
+                assetsPage.getSize(),
+                assetsPage.getTotalElements(),
+                assetsPage.getTotalPages(),
+                assetsPage.isLast()
+        );
+    }
+
+
+
+    @GetMapping("/filter/export")
+    public void exportFilteredAssets(
+            @RequestParam(required = false) AssetStatus status,
+            @RequestParam(required = false) AssetType type,
+            @RequestParam(required = false) Department department,
+            @RequestParam(required = false) String createdBy,
+            @RequestParam(required = false) Long siteId,
+            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate purchaseStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate purchaseEnd,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdEnd,
+            @RequestParam(required = false) String keyword,
+            HttpServletResponse response
+    ) throws IOException {
+        System.out.println("request received ");
+        List<AssetDTO> assets = assetService.filterAssetsNoPaging(
+                status, type, department, createdBy, siteId, locationId,
+                purchaseStart, purchaseEnd, createdStart, createdEnd, keyword
+        );
+
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition", "attachment; filename=FilteredAssets.xlsx");
+
+        assetService.writeAssetsToExcel(assets, response.getOutputStream());
+    }
+
+
+
     @GetMapping("/counts")
     public ResponseEntity<Map<String, Long>> getAssetCounts() {
         Map<String, Long> assetCounts = assetService.getAssetCounts();
@@ -95,17 +227,17 @@ public class AssetController {
 
         @PostMapping
         public ResponseEntity<AssetDTO> createAsset(@RequestBody Asset asset) {
-            log.debug("Received asset creation request with data: {}", asset);
+//            log.debug("Received asset creation request with data: {}", asset);
 
             try {
                 AssetDTO savedAsset = assetService.saveAsset(asset);
-                log.debug("Asset created successfully: {}", savedAsset);
+//                log.debug("Asset created successfully: {}", savedAsset);
                 return ResponseEntity.status(HttpStatus.CREATED).body(savedAsset);
             } catch (IllegalArgumentException e) {
-                log.warn("Invalid asset data provided: {}", e.getMessage());
+//                log.warn("Invalid asset data provided: {}", e.getMessage());
                 return ResponseEntity.badRequest().body(null);
             } catch (Exception e) {
-                log.error("Unexpected error during asset creation", e);
+//                log.error("Unexpected error during asset creation", e);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
         }
@@ -222,10 +354,10 @@ public class AssetController {
         return ResponseEntity.ok(historyDTOs);
     }
 
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<AssetDTO>> getAssetsByUser(@PathVariable Long userId) {
+    @GetMapping("/user/{empId}")
+    public ResponseEntity<List<AssetDTO>> getAssetsByUser(@PathVariable String empId) {
         try {
-            List<AssetDTO> assets = assetService.getAssetsByUser(userId);
+            List<AssetDTO> assets = assetService.getAssetsByUser(empId);
             return ResponseEntity.ok(assets);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();

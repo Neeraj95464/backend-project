@@ -1,27 +1,42 @@
 package AssetManagement.AssetManagement.service;
 
-import AssetManagement.AssetManagement.dto.AssetReservationRequest;
-import AssetManagement.AssetManagement.dto.CheckInDTO;
-import AssetManagement.AssetManagement.dto.CheckOutDTO;
+import AssetManagement.AssetManagement.dto.*;
 import AssetManagement.AssetManagement.entity.*;
 import AssetManagement.AssetManagement.enums.AssetStatus;
-import AssetManagement.AssetManagement.dto.AssetDTO;
+import AssetManagement.AssetManagement.enums.AssetType;
+import AssetManagement.AssetManagement.enums.Department;
+import AssetManagement.AssetManagement.enums.Role;
 import AssetManagement.AssetManagement.exception.AssetDisposalException;
 import AssetManagement.AssetManagement.exception.AssetNotFoundException;
 import AssetManagement.AssetManagement.exception.UserNotFoundException;
 import AssetManagement.AssetManagement.repository.*;
+import AssetManagement.AssetManagement.util.AssetSpecification;
 import AssetManagement.AssetManagement.util.AuthUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.Sort;
+
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+
 
 @Service
 @Slf4j
@@ -207,11 +222,160 @@ public class AssetService {
     }
 
     // Retrieve all assets
-    public List<AssetDTO> getAllAssets() {
-        return assetRepository.findAll().stream()
+//    public List<AssetDTO> getAllAssets() {
+//        return assetRepository.findAll().stream()
+//                .map(this::convertAssetToDto)
+//                .collect(Collectors.toList());
+//    }
+
+    public PaginatedResponse<AssetDTO> getAllAssets(Pageable pageable) {
+        Page<Asset> assetsPage = assetRepository.findAll(pageable);
+
+        List<AssetDTO> assetDTOs = assetsPage.getContent()
+                .stream()
                 .map(this::convertAssetToDto)
                 .collect(Collectors.toList());
+
+        return new PaginatedResponse<>(
+                assetDTOs,
+                assetsPage.getNumber(),
+                assetsPage.getSize(),
+                assetsPage.getTotalElements(),
+                assetsPage.getTotalPages(),
+                assetsPage.isLast()
+        );
     }
+
+
+
+    public Page<AssetDTO> filterAssets(
+            AssetStatus status,
+            AssetType type,
+            Department dept,
+            String createdBy,
+            Long siteId,
+            Long locationId,
+            LocalDate purchaseStart,
+            LocalDate purchaseEnd,
+            LocalDateTime createdStart,
+            LocalDateTime createdEnd,
+            String keyword,
+            int page,
+            int size
+    ) {
+        Specification<Asset> spec = Specification.where(null);
+
+        spec = spec.and(AssetSpecification.hasStatus(status))
+                .and(AssetSpecification.hasAssetType(type))
+                .and(AssetSpecification.hasDepartment(dept))
+                .and(AssetSpecification.createdBy(createdBy))
+                .and(AssetSpecification.hasSite(siteId))
+                .and(AssetSpecification.hasLocation(locationId))
+                .and(AssetSpecification.purchaseDateBetween(purchaseStart, purchaseEnd))
+                .and(AssetSpecification.createdAtBetween(createdStart, createdEnd))
+                .and(AssetSpecification.keywordSearch(keyword));
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        // Fetch Page<Asset> from repository
+        Page<Asset> assetsPage = assetRepository.findAll(spec, pageable);
+
+        // Convert each Asset to AssetDTO
+        return assetsPage.map(this::convertAssetToDto);
+    }
+
+    public List<AssetDTO> filterAssetsNoPaging(
+            AssetStatus status,
+            AssetType type,
+            Department dept,
+            String createdBy,
+            Long siteId,
+            Long locationId,
+            LocalDate purchaseStart,
+            LocalDate purchaseEnd,
+            LocalDateTime createdStart,
+            LocalDateTime createdEnd,
+            String keyword
+    ) {
+        Specification<Asset> spec = Specification.where(null);
+
+        spec = spec.and(AssetSpecification.hasStatus(status))
+                .and(AssetSpecification.hasAssetType(type))
+                .and(AssetSpecification.hasDepartment(dept))
+                .and(AssetSpecification.createdBy(createdBy))
+                .and(AssetSpecification.hasSite(siteId))
+                .and(AssetSpecification.hasLocation(locationId))
+                .and(AssetSpecification.purchaseDateBetween(purchaseStart, purchaseEnd))
+                .and(AssetSpecification.createdAtBetween(createdStart, createdEnd))
+                .and(AssetSpecification.keywordSearch(keyword));
+
+        List<Asset> list = assetRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return list.stream().map(this::convertAssetToDto).toList();
+    }
+
+
+
+    public void writeAssetsToExcel(List<AssetDTO> assets, OutputStream os) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Assets");
+
+            // ==== Create header row ====
+            String[] headers = {
+                    "Asset Tag", "Name", "Brand", "Model", "Department", "Asset Type",
+                    "Created By", "Description", "Serial No", "Purchase Date", "Status",
+                    "Location", "Site", "Assigned User", "Assigned User EmpId",
+                    "Status Note", "Reservation Start", "Reservation End", "Created At"
+            };
+
+            // Bold style for headers
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // ==== Fill Data Rows ====
+            int rowIdx = 1;
+            for (AssetDTO asset : assets) {
+                Row row = sheet.createRow(rowIdx++);
+
+                row.createCell(0).setCellValue(asset.getAssetTag() != null ? asset.getAssetTag() : "");
+                row.createCell(1).setCellValue(asset.getName() != null ? asset.getName() : "");
+                row.createCell(2).setCellValue(asset.getBrand() != null ? asset.getBrand() : "");
+                row.createCell(3).setCellValue(asset.getModel() != null ? asset.getModel() : "");
+                row.createCell(4).setCellValue(asset.getDepartment() != null ? asset.getDepartment() : "");
+                row.createCell(5).setCellValue(asset.getAssetType() != null ? asset.getAssetType() : "");
+                row.createCell(6).setCellValue(asset.getCreatedBy() != null ? asset.getCreatedBy() : "");
+                row.createCell(7).setCellValue(asset.getDescription() != null ? asset.getDescription() : "");
+                row.createCell(8).setCellValue(asset.getSerialNumber() != null ? asset.getSerialNumber() : "");
+                row.createCell(9).setCellValue(asset.getPurchaseDate() != null ? asset.getPurchaseDate().toString() : "");
+                row.createCell(10).setCellValue(asset.getStatus() != null ? asset.getStatus() : "");
+                row.createCell(11).setCellValue(asset.getLocationName() != null ? asset.getLocationName() : "");
+                row.createCell(12).setCellValue(asset.getSiteName() != null ? asset.getSiteName() : "");
+                row.createCell(13).setCellValue(asset.getAssignedUserName() != null ? asset.getAssignedUserName() : "");
+                row.createCell(14).setCellValue(asset.getAssignedUserEmpId() != null ? asset.getAssignedUserEmpId() : "");
+                row.createCell(15).setCellValue(asset.getStatusNote() != null ? asset.getStatusNote() : "");
+                row.createCell(16).setCellValue(asset.getReservationStartDate() != null ? asset.getReservationStartDate().toString() : "");
+                row.createCell(17).setCellValue(asset.getReservationEndDate() != null ? asset.getReservationEndDate().toString() : "");
+                row.createCell(18).setCellValue(asset.getCreatedAt() != null ? asset.getCreatedAt().toString() : "");
+            }
+
+            // ==== Auto-size all columns ====
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            workbook.write(os);
+        }
+    }
+
+
 
     // Save a new asset
 //        @Transactional
@@ -230,23 +394,23 @@ public class AssetService {
 
         @Transactional
         public AssetDTO saveAsset(Asset asset) {
-            log.debug("Attempting to save asset: {}", asset);
+//            log.debug("Attempting to save asset: {}", asset);
 
             // Validate uniqueness before saving
             validateUniqueFields(asset);
-            log.debug("Validation passed for asset: {}", asset.getName());
+//            log.debug("Validation passed for asset: {}", asset.getName());
 
             String createdBy = AuthUtils.getAuthenticatedUserExactName();
             asset.setCreatedBy(createdBy);
             asset.setCreatedAt(LocalDateTime.now());
 
-            log.debug("Setting createdBy={} and createdAt={} for asset", createdBy, asset.getCreatedAt());
+//            log.debug("Setting createdBy={} and createdAt={} for asset", createdBy, asset.getCreatedAt());
 
             Asset savedAsset = assetRepository.save(asset);
-            log.debug("Asset saved with ID: {}", savedAsset.getId());
+//            log.debug("Asset saved with ID: {}", savedAsset.getId());
 
             AssetDTO dto = convertAssetToDto(savedAsset);
-            log.debug("Converted Asset to DTO: {}", dto);
+//            log.debug("Converted Asset to DTO: {}", dto);
 
             return dto;
         }
@@ -443,8 +607,11 @@ public class AssetService {
     }
 
     // Retrieve assets assigned to a user
-    public List<AssetDTO> getAssetsByUser(Long userId) {
-        User user = findUserById(userId);
+    public List<AssetDTO> getAssetsByUser(String empId) {
+
+        User user = userRepository.findByEmployeeId(empId)
+                .orElseThrow(()->new UserNotFoundException("User not found "+empId));
+
         return assetRepository.findByAssignedUser(user).stream()
                 .map(this::convertAssetToDto)
                 .collect(Collectors.toList());
@@ -795,6 +962,7 @@ public class AssetService {
         dto.setSiteName(asset.getSite() != null ? asset.getSite().getName() : null);
 
         dto.setAssignedUserName(asset.getAssignedUser() != null ? asset.getAssignedUser().getUsername() : null);
+        dto.setAssignedUserEmpId(asset.getAssignedUser() != null ? asset.getAssignedUser().getEmployeeId() : null);
 
         dto.setReservationStartDate(asset.getReservationStartDate());
         dto.setReservationEndDate(asset.getReservationEndDate());

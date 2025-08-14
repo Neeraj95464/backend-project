@@ -11,6 +11,7 @@ public class ResolutionStats {
     private Double avg;
     private Double min;
     private Double max;
-    private Integer ticketCount;
+    private Integer ticketClosed;
+    private Integer ticketOpened;
     // constructor, getters
 }

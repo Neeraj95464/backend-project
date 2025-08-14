@@ -27,6 +27,7 @@ public class AssetDTO {
     private String locationName;
     private String siteName;
     private String assignedUserName;
+    private String assignedUserEmpId;
 
     // Additional fields for notes
     private String statusNote;
