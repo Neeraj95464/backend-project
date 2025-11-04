@@ -33,6 +33,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -82,8 +83,6 @@ public class UserAssetController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) TicketStatus status) {
-
-//        System.out.println("Request received with "+status);
 
         PaginatedResponse<TicketDTO> response = ticketService.getAllTicketsForAdmin(page, size, status);
         return ResponseEntity.ok(response);
@@ -498,4 +497,47 @@ public class UserAssetController {
     public ResponseEntity<List<AssigneeFeedbackStatsDTO>> getAllFeedbacksGroupedByAssignee() {
         return ResponseEntity.ok(ticketService.getFeedbackGroupedByAssignee());
     }
+
+
+    @GetMapping("/updated/filter")
+    public PaginatedResponse<TicketDTO> filterTickets(
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) TicketStatus status,
+            @RequestParam(required = false) TicketCategory category,
+            @RequestParam(required = false) String employeeId,
+            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String assigneeId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdAfter,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdBefore,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long siteIdLocationId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        System.out.println("Request received ");
+        return ticketService.filterTickets(title, status, category, employeeId, locationId, assigneeId, createdAfter, createdBefore,search,siteIdLocationId, page, size);
+    }
+
+
+    @GetMapping("/updated/download")
+    public ResponseEntity<byte[]> downloadFilteredTickets(
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) TicketStatus status,
+            @RequestParam(required = false) TicketCategory category,
+            @RequestParam(required = false) String employeeId,
+            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String assigneeId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdAfter,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdBefore,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long siteIdLocationId
+    ) throws IOException {
+
+        ByteArrayInputStream in = ticketService.exportTicketsToExcel(title, status, category, employeeId, locationId, assigneeId, createdAfter, createdBefore,search,siteIdLocationId);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=tickets.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(in.readAllBytes());
+    }
+
 }

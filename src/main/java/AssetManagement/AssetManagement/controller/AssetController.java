@@ -54,15 +54,7 @@ public class AssetController {
         this.assetRepository = assetRepository;
     }
 
-//    @GetMapping
-//    public ResponseEntity<List<AssetDTO>> getAllAssets() {
-//        try {
-//            List<AssetDTO> assets = assetService.getAllAssets();
-//            return ResponseEntity.ok(assets);
-//        } catch (Exception e) {
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-//        }
-//    }
+
 @GetMapping
 public ResponseEntity<PaginatedResponse<AssetDTO>> getAllAssets(
         @RequestParam(defaultValue = "0") int page,
@@ -86,32 +78,6 @@ public ResponseEntity<PaginatedResponse<AssetDTO>> getAllAssets(
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 }
-
-
-//    @GetMapping("/filter")
-//    public Page<AssetDTO> filterAssets(
-//            @RequestParam(required = false) AssetStatus status,
-//            @RequestParam(required = false) AssetType type,
-//            @RequestParam(required = false) Department department,
-//            @RequestParam(required = false) String createdBy,
-//            @RequestParam(required = false) Long siteId,
-//            @RequestParam(required = false) Long locationId,
-//            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate purchaseStart,
-//            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate purchaseEnd,
-//            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdStart,
-//            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdEnd,
-//            @RequestParam(required = false) String keyword,
-//            @RequestParam(defaultValue = "0") int page,
-//            @RequestParam(defaultValue = "10") int size
-//    ) {
-//        return assetService.filterAssets(
-//                status, type, department,
-//                createdBy, siteId, locationId,
-//                purchaseStart, purchaseEnd,
-//                createdStart, createdEnd,
-//                keyword, page, size
-//        );
-//    }
 
 
     @GetMapping("/filter")
@@ -242,12 +208,28 @@ public ResponseEntity<PaginatedResponse<AssetDTO>> getAllAssets(
             }
         }
 
-    @PostMapping("/bulk")
-    public ResponseEntity<List<AssetDTO>> createAssetsBulk(@RequestBody List<Asset> assets) {
-        log.debug("Received bulk asset creation request. Total assets: {}", assets.size());
+//    @PostMapping("/bulk")
+//    public ResponseEntity<List<AssetDTO>> createAssetsBulk(@RequestBody List<Asset> assets) {
+//        log.debug("Received bulk asset creation request. Total assets: {}", assets.size());
+//
+//        try {
+//            List<AssetDTO> savedAssets = assetService.saveAssetsBulk(assets);
+//            log.debug("Bulk asset creation successful. Saved: {}", savedAssets.size());
+//            return ResponseEntity.status(HttpStatus.CREATED).body(savedAssets);
+//        } catch (Exception e) {
+//            log.error("Bulk asset creation failed", e);
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+//        }
+//    }
 
+
+    @PostMapping("/bulk")
+    public ResponseEntity<List<AssetDTO>> createAssetsBulk(
+            @RequestBody List<AssetDTO> assetRequests) {
+
+        log.debug("Received bulk asset creation request. Total assets: {}", assetRequests.size());
         try {
-            List<AssetDTO> savedAssets = assetService.saveAssetsBulk(assets);
+            List<AssetDTO> savedAssets = assetService.saveAssetsBulk(assetRequests);
             log.debug("Bulk asset creation successful. Saved: {}", savedAssets.size());
             return ResponseEntity.status(HttpStatus.CREATED).body(savedAssets);
         } catch (Exception e) {
@@ -326,6 +308,7 @@ public ResponseEntity<PaginatedResponse<AssetDTO>> getAllAssets(
     @DeleteMapping("/{assetTag}")
     public ResponseEntity<Void> deleteAsset(@PathVariable String assetTag) {
         try {
+
             assetService.deleteAsset(assetTag);
             return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {

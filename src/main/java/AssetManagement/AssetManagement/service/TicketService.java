@@ -8,8 +8,14 @@ import AssetManagement.AssetManagement.mapper.TicketMapper;
 import AssetManagement.AssetManagement.repository.*;
 import AssetManagement.AssetManagement.util.AuthUtils;
 import AssetManagement.AssetManagement.util.TicketSpecification;
+import AssetManagement.AssetManagement.util.TicketsSpecification;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
@@ -26,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -709,10 +716,6 @@ public class TicketService {
     }
 
 
-
-
-
-
     public TicketDTO updateTicketStatus(Long ticketId, TicketStatus newStatus) {
         String updatedByEmployeeId = AuthUtils.getAuthenticatedUsername();
         Ticket ticket = ticketRepository.findById(ticketId)
@@ -836,6 +839,7 @@ public class TicketService {
         List<TicketDTO> paginatedList = combinedTickets.subList(start, end).stream()
                 .map(this::convertTicketToDTO)
                 .collect(Collectors.toList());
+
 
         return new PaginatedResponse<>(
                 paginatedList,
@@ -1720,35 +1724,6 @@ public class TicketService {
     }
 
 
-//    public Page<TicketWithFeedbackDTO> getTicketsWithFeedback(String employeeId, int page, int size) {
-//        Pageable pageable = PageRequest.of(page, size, Sort.by("submittedAt").descending());
-//        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername()).orElseThrow(
-//                ()->new UserNotFoundException("Authenticated user not found ")
-//        );
-//        TicketDepartment ticketDepartment = TicketDepartment.valueOf(user.getDepartment().name());
-//
-//        Page<TicketFeedback> feedbackPage = ticketFeedbackRepository.findByDepartmentAndAssignee(ticketDepartment,employeeId, pageable);
-//
-//        return feedbackPage.map(f -> {
-//            Ticket ticket = f.getTicket();
-//            return new TicketWithFeedbackDTO(
-//                    ticket.getId(),
-//                    ticket.getTitle(),
-//                    ticket.getDescription(),
-//                    ticket.getCategory(),
-//                    ticket.getStatus(),
-//                    ticket.getTicketDepartment(),
-//                    ticket.getCreatedBy(),
-//                    ticket.getAssignee() != null ? ticket.getAssignee().getUsername() : "Unassigned",
-//                    ticket.getCreatedAt(),
-//                    f.getRating(),
-//                    f.getMessage(),
-//                    f.getSubmittedAt()
-//            );
-//        });
-//    }
-
-
     public Page<TicketWithFeedbackDTO> getTicketsWithFeedback(String employeeId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("submittedAt").descending());
 
@@ -1780,6 +1755,107 @@ public class TicketService {
                     f.getSubmittedAt()
             );
         });
+    }
+
+
+    public PaginatedResponse<TicketDTO> filterTickets(String title, TicketStatus status, TicketCategory category,
+                                                      String employeeId, Long locationId, String assigneeId,
+                                                      LocalDateTime createdAfter, LocalDateTime createdBefore,
+                                                      String search,
+                                                      Long siteIdLocationId,
+                                                      int page, int size) {
+        Specification<Ticket> spec = Specification.where(TicketsSpecification.hasTitle(title))
+                .and(TicketsSpecification.hasStatus(status))
+                .and(TicketsSpecification.hasCategory(category))
+                .and(TicketsSpecification.hasEmployeeId(employeeId))
+                .and(TicketsSpecification.hasLocationId(locationId))
+                .and(TicketsSpecification.hasAssigneeEmployeeId(assigneeId))
+                .and(TicketsSpecification.createdAfter(createdAfter))
+                .and(TicketsSpecification.createdBefore(createdBefore))
+                .and(TicketsSpecification.globalSearch(search))
+                .and(TicketsSpecification.hasSiteAndLocation(siteIdLocationId,locationId));
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Ticket> ticketPage = ticketRepository.findAll(spec, pageable);
+
+        List<TicketDTO> ticketDTOs = ticketPage.stream()
+                .map(this::convertTicketToDTO)
+                .collect(Collectors.toList());
+
+        return new PaginatedResponse<>(
+                ticketDTOs,
+                ticketPage.getNumber(),
+                ticketPage.getSize(),
+                ticketPage.getTotalElements(),
+                ticketPage.getTotalPages(),
+                ticketPage.isLast()
+        );
+    }
+
+
+        public ByteArrayInputStream exportTicketsToExcel(String title, TicketStatus status, TicketCategory category,
+                                                         String employeeId, Long locationId, String assigneeId,
+                                                         LocalDateTime createdAfter, LocalDateTime createdBefore,
+                                                         String search,
+        Long siteIdLocationId) throws IOException {
+            List<TicketDTO> tickets = filterTicketsNoPagination(title, status, category, employeeId, locationId, assigneeId, createdAfter, createdBefore,search, siteIdLocationId);
+
+            try (Workbook workbook = new XSSFWorkbook()) {
+                Sheet sheet = workbook.createSheet("Tickets");
+
+                Row header = sheet.createRow(0);
+                header.createCell(0).setCellValue("ID");
+                header.createCell(1).setCellValue("Title");
+                header.createCell(2).setCellValue("Status");
+                header.createCell(3).setCellValue("Category");
+                header.createCell(4).setCellValue("Employee");
+                header.createCell(5).setCellValue("Assignee");
+                header.createCell(6).setCellValue("Location");
+                header.createCell(7).setCellValue("Created At");
+
+                int rowIdx = 1;
+                for (TicketDTO ticket : tickets) {
+                    Row row = sheet.createRow(rowIdx++);
+                    row.createCell(0).setCellValue(ticket.getId());
+                    row.createCell(1).setCellValue(ticket.getTitle());
+                    row.createCell(2).setCellValue(ticket.getStatus() != null ? ticket.getStatus().name() : "");
+                    row.createCell(3).setCellValue(ticket.getCategory() != null ? ticket.getCategory().name() : "");
+                    row.createCell(4).setCellValue(ticket.getEmployee().getUsername() != null ? ticket.getEmployee().getUsername() : "");
+                    row.createCell(5).setCellValue(ticket.getAssignee().getUsername() != null ? ticket.getAssignee().getUsername() : "");
+                    row.createCell(6).setCellValue(ticket.getLocationName() != null ? ticket.getLocationName() : "");
+                    row.createCell(7).setCellValue(ticket.getCreatedAt() != null ? ticket.getCreatedAt().toString() : "");
+                }
+
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                workbook.write(out);
+                return new ByteArrayInputStream(out.toByteArray());
+            }
+        }
+
+        // Make sure your TicketDTO has the corresponding fields: employeeUsername, assigneeUsername, locationName etc.
+
+
+
+    public List<TicketDTO> filterTicketsNoPagination(String title, TicketStatus status, TicketCategory category,
+                                                     String employeeId, Long locationId, String assigneeId,
+                                                     LocalDateTime createdAfter, LocalDateTime createdBefore
+            ,String search, Long siteIdLocationId) {
+        Specification<Ticket> spec = Specification.where(TicketsSpecification.hasTitle(title))
+                .and(TicketsSpecification.hasStatus(status))
+                .and(TicketsSpecification.hasCategory(category))
+                .and(TicketsSpecification.hasEmployeeId(employeeId))
+                .and(TicketsSpecification.hasLocationId(locationId))
+                .and(TicketsSpecification.hasAssigneeEmployeeId(assigneeId))
+                .and(TicketsSpecification.createdAfter(createdAfter))
+                .and(TicketsSpecification.createdBefore(createdBefore))
+                .and(TicketsSpecification.globalSearch(search))
+                .and(TicketsSpecification.hasSiteAndLocation(siteIdLocationId,locationId));
+
+        List<Ticket> tickets = ticketRepository.findAll(spec);
+
+        return tickets.stream()
+                .map(this::convertTicketToDTO)
+                .collect(Collectors.toList());
     }
 
 

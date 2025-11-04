@@ -10,6 +10,7 @@ import AssetManagement.AssetManagement.exception.AssetDisposalException;
 import AssetManagement.AssetManagement.exception.AssetNotFoundException;
 import AssetManagement.AssetManagement.exception.UserNotFoundException;
 import AssetManagement.AssetManagement.repository.*;
+import AssetManagement.AssetManagement.util.AssetMapper;
 import AssetManagement.AssetManagement.util.AssetSpecification;
 import AssetManagement.AssetManagement.util.AuthUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -46,15 +47,17 @@ public class AssetService {
     private final UserRepository userRepository;
     private final AssetHistoryRepository assetHistoryRepository;
     private final SiteRepository siteRepository;
+    private final AssetMapper assetMapper;
     private final LocationRepository locationRepository;
     private final AssetHistoryService assetHistoryService;
     private static final Logger logger = LoggerFactory.getLogger(AssetService.class);
 
-    public AssetService(AssetRepository assetRepository, UserRepository userRepository, AssetHistoryRepository assetHistoryRepository, SiteRepository siteRepository, LocationRepository locationRepository, AssetHistoryService assetHistoryService) {
+    public AssetService(AssetRepository assetRepository, UserRepository userRepository, AssetHistoryRepository assetHistoryRepository, SiteRepository siteRepository, AssetMapper assetMapper, LocationRepository locationRepository, AssetHistoryService assetHistoryService) {
         this.assetRepository = assetRepository;
         this.userRepository = userRepository;
         this.assetHistoryRepository = assetHistoryRepository;
         this.siteRepository = siteRepository;
+        this.assetMapper = assetMapper;
         this.locationRepository = locationRepository;
         this.assetHistoryService = assetHistoryService;
     }
@@ -415,25 +418,66 @@ public class AssetService {
             return dto;
         }
 
-    @Transactional
-    public List<AssetDTO> saveAssetsBulk(List<Asset> assets) {
-        List<AssetDTO> result = new ArrayList<>();
+//    @Transactional
+//    public List<AssetDTO> saveAssetsBulk(List<Asset> assets) {
+//        List<AssetDTO> result = new ArrayList<>();
+//
+//        for (Asset asset : assets) {
+//            try {
+//                validateUniqueFields(asset); // Optional: skip or collect invalids
+//                asset.setCreatedBy(AuthUtils.getAuthenticatedUserExactName());
+//                asset.setCreatedAt(LocalDateTime.now());
+//
+//                Asset saved = assetRepository.save(asset);
+//                result.add(convertAssetToDto(saved));
+//            } catch (Exception e) {
+//                log.warn("Failed to save asset: {}, reason: {}", asset.getName(), e.getMessage());
+//            }
+//        }
+//
+//        return result;
+//    }
 
-        for (Asset asset : assets) {
+    @Transactional
+    public List<AssetDTO> saveAssetsBulk(List<AssetDTO> assetDtos) {
+        List<Asset> assetsToSave = new ArrayList<>();
+
+        for (AssetDTO dto : assetDtos) {
             try {
-                validateUniqueFields(asset); // Optional: skip or collect invalids
+                // ✅ Use your mapper/converter, not the Asset instance
+                Asset asset = assetMapper.dtoToEntity(dto);
+
+                // ✅ Run unique field validation before saving
+                validateUniqueFields(asset);
+
+                // ✅ Always set system-managed fields in service
                 asset.setCreatedBy(AuthUtils.getAuthenticatedUserExactName());
                 asset.setCreatedAt(LocalDateTime.now());
+//                asset.setTenantId(AuthUtils.getCurrentTenantId());
 
-                Asset saved = assetRepository.save(asset);
-                result.add(convertAssetToDto(saved));
+                assetsToSave.add(asset);
+
             } catch (Exception e) {
-                log.warn("Failed to save asset: {}, reason: {}", asset.getName(), e.getMessage());
+                // ✅ Skip problematic records & log them
+                log.warn("Skipping asset '{}', reason: {}", dto.getName(), e.getMessage());
             }
         }
 
-        return result;
+        if (assetsToSave.isEmpty()) {
+            log.warn("No valid assets to save in bulk operation");
+            return Collections.emptyList();
+        }
+
+        // ✅ Save all at once — fewer DB round trips
+        List<Asset> savedAssets = assetRepository.saveAll(assetsToSave);
+
+        // ✅ Convert entities back to DTOs for response
+        return savedAssets.stream()
+                .map(assetMapper::entityToDto)
+                .toList();
     }
+
+
 
     private void validateUniqueFields(Asset asset) {
             Optional<Asset> existingBySerial = assetRepository.findBySerialNumber(asset.getSerialNumber());
@@ -472,8 +516,6 @@ public class AssetService {
         asset.setStatus(AssetStatus.DELETED);
         assetRepository.save(asset);
 
-        // ❌ Option 2: Hard Delete (Use with Caution)
-        // assetRepository.delete(asset);
     }
 
     // Update asset status
@@ -644,6 +686,7 @@ public class AssetService {
         asset.setStatus(AssetStatus.CHECKED_OUT);
         asset.setStatusNote(checkOutDTO.getCheckOutNote());
         asset.setLocation(checkOutDTO.getLocation());
+        asset.setSite(checkOutDTO.getSite());
         asset.setDepartment(checkOutDTO.getDepartment());
 
         // 💾 Save changes

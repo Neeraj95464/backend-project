@@ -56,6 +56,18 @@
 			<scope>runtime</scope>
 		</dependency>
 
+<!--		<dependency>-->
+<!--			<groupId>org.mapstruct</groupId>-->
+<!--			<artifactId>mapstruct</artifactId>-->
+<!--			<version>1.5.5.Final</version> &lt;!&ndash; or latest stable &ndash;&gt;-->
+<!--		</dependency>-->
+<!--		<dependency>-->
+<!--			<groupId>org.mapstruct</groupId>-->
+<!--			<artifactId>mapstruct-processor</artifactId>-->
+<!--			<version>1.5.5.Final</version>-->
+<!--			<scope>provided</scope>-->
+<!--		</dependency>-->
+
 
 		<dependency>
 			<groupId>org.apache.poi</groupId>
@@ -144,6 +156,29 @@
 		</dependency>
 
 
+			<!-- MapStruct API -->
+			<dependency>
+				<groupId>org.mapstruct</groupId>
+				<artifactId>mapstruct</artifactId>
+				<version>1.5.5.Final</version>
+			</dependency>
+
+			<!-- MapStruct Processor -->
+			<dependency>
+				<groupId>org.mapstruct</groupId>
+				<artifactId>mapstruct-processor</artifactId>
+				<version>1.5.5.Final</version>
+				<scope>provided</scope>
+			</dependency>
+
+			<!-- Lombok -->
+			<dependency>
+				<groupId>org.projectlombok</groupId>
+				<artifactId>lombok</artifactId>
+				<version>1.18.30</version>
+				<scope>provided</scope>
+			</dependency>
+
 
 		<dependency>
 				<groupId>org.springframework.boot</groupId>
@@ -218,7 +253,16 @@
 							<artifactId>lombok</artifactId>
 							<version>1.18.30</version>
 						</path>
+
+						<!-- MapStruct -->
+						<path>
+							<groupId>org.mapstruct</groupId>
+							<artifactId>mapstruct-processor</artifactId>
+							<version>1.5.5.Final</version>
+						</path>
 					</annotationProcessorPaths>
+
+
 				</configuration>
 			</plugin>
 

@@ -127,10 +127,6 @@ public class EmailService {
         System.out.println("✅ Email sent to " + toEmail + " via Graph API");
     }
 
-
-
-
-
     @Scheduled(fixedRate = 60000)
     public void checkEmailsForTickets() {
         String mailboxUser = "support@mahavirgroup.co";
@@ -443,9 +439,6 @@ public class EmailService {
     }
 
 
-
-
-
     public void sendReplyToTicket(Long ticketId, String messageContent) {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new EntityNotFoundException("Ticket not found"));
@@ -478,8 +471,6 @@ public class EmailService {
 
         System.out.println("✅ Reply sent for Ticket ID: " + ticketId + " via Graph API");
     }
-
-
 
     // this method is called when we are sending mail in already created ticket to add like message.
     private void saveReplyToTicket(Long ticketId, String senderEmail, String messageContent,List<String> ccEmails) {
@@ -565,7 +556,6 @@ public class EmailService {
 //        );
     }
 
-
     public void sendInternalMail(String senderEmail, String messagePreview, List<String> ccEmails,Ticket ticket) {
         // Build TO recipient (sender)
         Recipient toRecipient = new Recipient();
@@ -626,10 +616,6 @@ public class EmailService {
 
         System.out.println("✅ Styled email sent to " + senderEmail + " with CC: " + ccEmails);
     }
-
-
-
-
 
     public void sendAcknowledgmentReplyToTicket(
             Long ticketId,
