@@ -7,6 +7,7 @@ import AssetManagement.AssetManagement.exception.UserNotFoundException;
 import AssetManagement.AssetManagement.mapper.TicketMapper;
 import AssetManagement.AssetManagement.repository.*;
 import AssetManagement.AssetManagement.util.AuthUtils;
+import AssetManagement.AssetManagement.util.TicketDepartmentMapper;
 import AssetManagement.AssetManagement.util.TicketSpecification;
 import AssetManagement.AssetManagement.util.TicketsSpecification;
 import jakarta.persistence.EntityNotFoundException;
@@ -668,7 +669,7 @@ public class TicketService {
             <body>
                 <h2>Thanks for rating!</h2>
                 <p>We’d really appreciate it if you could tell us more:</p>
-                <form method='post' action='https://crack-segment-hobbies-albert.trycloudflare.com/api/feedback/message'>
+                <form method='post' action='https://mahavir-asset.duckdns.org/api/feedback/message'>
                     <input type='hidden' name='ticketId' value='%d'/>
                     <textarea name='message' placeholder='Your feedback' required></textarea><br/>
                     <button type='submit'>Submit Message</button>
@@ -684,36 +685,176 @@ public class TicketService {
 
 
     public String generateFeedbackEmailHtml(Long ticketId) {
-        String feedbackApiUrl = "https://crack-segment-hobbies-albert.trycloudflare.com/api/feedback"; // Update with real domain in prod
+        String feedbackApiUrl = "https://mahavir-asset.duckdns.org/api/feedback"; // Update with real domain in prod
 
         return """
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6;">
-            <p>Hello,</p>
-            <p>Your support ticket <strong>#%d</strong> has been resolved.</p>
-            <p>We would love to hear your feedback!</p>
-            <p>Please click a star below to rate your experience:</p>
-
-            <p style="font-size: 24px;">
-                <a href="%s?ticketId=%d&rating=1" title="Very Dissatisfied">⭐</a>
-                <a href="%s?ticketId=%d&rating=2" title="Dissatisfied">⭐</a>
-                <a href="%s?ticketId=%d&rating=3" title="Neutral">⭐</a>
-                <a href="%s?ticketId=%d&rating=4" title="Satisfied">⭐</a>
-                <a href="%s?ticketId=%d&rating=5" title="Very Satisfied">⭐</a>
-            </p>
-
-            <p>Thank you!<br><strong>IT Support Team</strong></p>
-        </body>
-        </html>
-    """.formatted(
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Arial, sans-serif;">
+        <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+                <td align="center" style="padding: 40px 20px;">
+                    <!-- Main Container -->
+                    <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" 
+                           style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        
+                        <!-- Header -->
+                        <tr>
+                            <td align="center" style="background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); 
+                                               padding: 30px 40px; border-radius: 12px 12px 0 0;">
+                                <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
+                                    ✓ Ticket Resolved Successfully
+                                </h1>
+                            </td>
+                        </tr>
+                        
+                        <!-- Content -->
+                        <tr>
+                            <td style="padding: 40px;">
+                                <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 10px 0;">
+                                    Hello,
+                                </p>
+                                
+                                <p style="color: #555555; font-size: 15px; line-height: 1.6; margin: 0 0 25px 0;">
+                                    Great news! Your support ticket <strong style="color: #667eea;">#%d</strong> 
+                                    has been successfully resolved by our team.
+                                </p>
+                                
+                                <!-- Feedback Section -->
+                                <div style="background-color: #f8f9fc; border-radius: 8px; padding: 30px; 
+                                           margin: 25px 0; border: 2px solid #e1e8ed;">
+                                    <h2 style="color: #333333; font-size: 18px; margin: 0 0 15px 0; text-align: center;">
+                                        How was your experience?
+                                    </h2>
+                                    
+                                    <p style="color: #666666; font-size: 14px; text-align: center; 
+                                              margin: 0 0 25px 0; line-height: 1.5;">
+                                        Your feedback helps us improve our service. Please take a moment to rate your experience:
+                                    </p>
+                                    
+                                    <!-- Star Rating -->
+                                    <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0">
+                                        <tr>
+                                            <td align="center">
+                                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" 
+                                                       style="display: inline-block;">
+                                                    <tr>
+                                                        <!-- 1 Star -->
+                                                        <td align="center" style="padding: 0 8px;">
+                                                            <a href="%s?ticketId=%d&rating=1" 
+                                                               style="text-decoration: none; display: block;">
+                                                                <div style="font-size: 40px; line-height: 1; 
+                                                                           transition: transform 0.2s;">⭐</div>
+                                                                <div style="font-size: 11px; color: #e74c3c; 
+                                                                           font-weight: 600; margin-top: 8px;">
+                                                                    1 - Poor
+                                                                </div>
+                                                            </a>
+                                                        </td>
+                                                        
+                                                        <!-- 2 Stars -->
+                                                        <td align="center" style="padding: 0 8px;">
+                                                            <a href="%s?ticketId=%d&rating=2" 
+                                                               style="text-decoration: none; display: block;">
+                                                                <div style="font-size: 40px; line-height: 1;">⭐</div>
+                                                                <div style="font-size: 11px; color: #e67e22; 
+                                                                           font-weight: 600; margin-top: 8px;">
+                                                                    2 - Fair
+                                                                </div>
+                                                            </a>
+                                                        </td>
+                                                        
+                                                        <!-- 3 Stars -->
+                                                        <td align="center" style="padding: 0 8px;">
+                                                            <a href="%s?ticketId=%d&rating=3" 
+                                                               style="text-decoration: none; display: block;">
+                                                                <div style="font-size: 40px; line-height: 1;">⭐</div>
+                                                                <div style="font-size: 11px; color: #f39c12; 
+                                                                           font-weight: 600; margin-top: 8px;">
+                                                                    3 - Good
+                                                                </div>
+                                                            </a>
+                                                        </td>
+                                                        
+                                                        <!-- 4 Stars -->
+                                                        <td align="center" style="padding: 0 8px;">
+                                                            <a href="%s?ticketId=%d&rating=4" 
+                                                               style="text-decoration: none; display: block;">
+                                                                <div style="font-size: 40px; line-height: 1;">⭐</div>
+                                                                <div style="font-size: 11px; color: #3498db; 
+                                                                           font-weight: 600; margin-top: 8px;">
+                                                                    4 - Great
+                                                                </div>
+                                                            </a>
+                                                        </td>
+                                                        
+                                                        <!-- 5 Stars -->
+                                                        <td align="center" style="padding: 0 8px;">
+                                                            <a href="%s?ticketId=%d&rating=5" 
+                                                               style="text-decoration: none; display: block;">
+                                                                <div style="font-size: 40px; line-height: 1;">⭐</div>
+                                                                <div style="font-size: 11px; color: #27ae60; 
+                                                                           font-weight: 600; margin-top: 8px;">
+                                                                    5 - Excellent
+                                                                </div>
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    
+                                    <p style="color: #999999; font-size: 12px; text-align: center; 
+                                              margin: 20px 0 0 0; font-style: italic;">
+                                        Click on any star to submit your rating
+                                    </p>
+                                </div>
+                                
+                                <!-- Closing -->
+                                <p style="color: #555555; font-size: 15px; line-height: 1.6; 
+                                          margin: 25px 0 0 0; text-align: center;">
+                                    Thank you for choosing our support services!
+                                </p>
+                                
+                                <p style="color: #667eea; font-size: 16px; font-weight: 600; 
+                                          margin: 10px 0 0 0; text-align: center;">
+                                    IT Support Team
+                                </p>
+                            </td>
+                        </tr>
+                        
+                        <!-- Footer -->
+                        <tr>
+                            <td align="center" style="background-color: #f8f9fc; padding: 20px; 
+                                               border-radius: 0 0 12px 12px; border-top: 1px solid #e1e8ed;">
+                                <p style="color: #999999; font-size: 12px; margin: 0; line-height: 1.5;">
+                                    This is an automated message regarding ticket #%d<br>
+                                    Please do not reply directly to this email
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+""".formatted(
                 ticketId,
                 feedbackApiUrl, ticketId,
                 feedbackApiUrl, ticketId,
                 feedbackApiUrl, ticketId,
                 feedbackApiUrl, ticketId,
-                feedbackApiUrl, ticketId
+                feedbackApiUrl, ticketId,
+                ticketId
         );
     }
+
 
 
     public TicketDTO updateTicketStatus(Long ticketId, TicketStatus newStatus) {
@@ -1764,7 +1905,45 @@ public class TicketService {
                                                       String search,
                                                       Long siteIdLocationId,
                                                       int page, int size) {
-        Specification<Ticket> spec = Specification.where(TicketsSpecification.hasTitle(title))
+
+        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(() -> new UserNotFoundException("Authenticated User not found"));
+
+        String role = user.getRole();
+        Specification<Ticket> deptSpec = null;
+
+        if (role == null) {
+            throw new RuntimeException("User role not set. Access denied.");
+        }
+
+        if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("HR_ADMIN")) {
+            // Admins see all tickets; no department filter
+//            System.out.println("User is admin - no department filter applied.");
+
+            if (user.getDepartment() == null) {
+                throw new RuntimeException("User department not specified.");
+            }
+
+            // Map to TicketDepartment safely or do string compare
+            TicketDepartment userDept = TicketDepartment.valueOf(user.getDepartment().name());
+
+            deptSpec = TicketsSpecification.hasDepartment(userDept);
+//            System.out.println("Department filter applied: " + userDept);
+        } else {
+            if (user.getDepartment() == null) {
+                throw new RuntimeException("User department not specified.");
+            }
+
+            // Map to TicketDepartment safely or do string compare
+            TicketDepartment userDept = TicketDepartment.valueOf(user.getDepartment().name());
+
+            deptSpec = TicketsSpecification.hasDepartment(userDept);
+//            System.out.println("Department filter applied: " + userDept);
+        }
+
+
+        Specification<Ticket> spec = Specification.where(deptSpec)
+                .and(TicketsSpecification.hasTitle(title))
                 .and(TicketsSpecification.hasStatus(status))
                 .and(TicketsSpecification.hasCategory(category))
                 .and(TicketsSpecification.hasEmployeeId(employeeId))
@@ -1773,9 +1952,12 @@ public class TicketService {
                 .and(TicketsSpecification.createdAfter(createdAfter))
                 .and(TicketsSpecification.createdBefore(createdBefore))
                 .and(TicketsSpecification.globalSearch(search))
-                .and(TicketsSpecification.hasSiteAndLocation(siteIdLocationId,locationId));
+                .and(TicketsSpecification.hasSiteAndLocation(siteIdLocationId, locationId));
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        System.out.println("Specification built: " + spec);
+
         Page<Ticket> ticketPage = ticketRepository.findAll(spec, pageable);
 
         List<TicketDTO> ticketDTOs = ticketPage.stream()
@@ -1793,7 +1975,8 @@ public class TicketService {
     }
 
 
-        public ByteArrayInputStream exportTicketsToExcel(String title, TicketStatus status, TicketCategory category,
+
+    public ByteArrayInputStream exportTicketsToExcel(String title, TicketStatus status, TicketCategory category,
                                                          String employeeId, Long locationId, String assigneeId,
                                                          LocalDateTime createdAfter, LocalDateTime createdBefore,
                                                          String search,
@@ -1835,12 +2018,63 @@ public class TicketService {
         // Make sure your TicketDTO has the corresponding fields: employeeUsername, assigneeUsername, locationName etc.
 
 
-
     public List<TicketDTO> filterTicketsNoPagination(String title, TicketStatus status, TicketCategory category,
                                                      String employeeId, Long locationId, String assigneeId,
                                                      LocalDateTime createdAfter, LocalDateTime createdBefore
             ,String search, Long siteIdLocationId) {
-        Specification<Ticket> spec = Specification.where(TicketsSpecification.hasTitle(title))
+
+
+        User user = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername())
+                .orElseThrow(() -> new UserNotFoundException("Authenticated User not found"));
+
+        String role = user.getRole();
+        Specification<Ticket> deptSpec = null;
+
+        if (role == null) {
+            throw new RuntimeException("User role not set. Access denied.");
+        }
+
+        if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("HR_ADMIN")) {
+            // Admins see all tickets; no department filter
+//            System.out.println("User is admin - no department filter applied.");
+
+            if (user.getDepartment() == null) {
+                throw new RuntimeException("User department not specified.");
+            }
+
+            // Map to TicketDepartment safely or do string compare
+            TicketDepartment userDept = TicketDepartment.valueOf(user.getDepartment().name());
+
+            deptSpec = TicketsSpecification.hasDepartment(userDept);
+//            System.out.println("Department filter applied: " + userDept);
+        } else {
+            if (user.getDepartment() == null) {
+                throw new RuntimeException("User department not specified.");
+            }
+
+            // Map to TicketDepartment safely or do string compare
+            TicketDepartment userDept = TicketDepartment.valueOf(user.getDepartment().name());
+
+            deptSpec = TicketsSpecification.hasDepartment(userDept);
+//            System.out.println("Department filter applied: " + userDept);
+        }
+
+
+
+//        Specification<Ticket> spec = Specification.where(TicketsSpecification.hasTitle(title))
+//                .and(TicketsSpecification.hasStatus(status))
+//                .and(TicketsSpecification.hasCategory(category))
+//                .and(TicketsSpecification.hasEmployeeId(employeeId))
+//                .and(TicketsSpecification.hasLocationId(locationId))
+//                .and(TicketsSpecification.hasAssigneeEmployeeId(assigneeId))
+//                .and(TicketsSpecification.createdAfter(createdAfter))
+//                .and(TicketsSpecification.createdBefore(createdBefore))
+//                .and(TicketsSpecification.globalSearch(search))
+//                .and(TicketsSpecification.hasSiteAndLocation(siteIdLocationId,locationId));
+
+
+        Specification<Ticket> spec = Specification.where(deptSpec)
+                .and(TicketsSpecification.hasTitle(title))
                 .and(TicketsSpecification.hasStatus(status))
                 .and(TicketsSpecification.hasCategory(category))
                 .and(TicketsSpecification.hasEmployeeId(employeeId))
@@ -1849,7 +2083,9 @@ public class TicketService {
                 .and(TicketsSpecification.createdAfter(createdAfter))
                 .and(TicketsSpecification.createdBefore(createdBefore))
                 .and(TicketsSpecification.globalSearch(search))
-                .and(TicketsSpecification.hasSiteAndLocation(siteIdLocationId,locationId));
+                .and(TicketsSpecification.hasSiteAndLocation(siteIdLocationId, locationId));
+
+
 
         List<Ticket> tickets = ticketRepository.findAll(spec);
 

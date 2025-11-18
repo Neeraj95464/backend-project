@@ -4,6 +4,7 @@ import AssetManagement.AssetManagement.entity.Location;
 import AssetManagement.AssetManagement.entity.Site;
 import AssetManagement.AssetManagement.entity.Ticket;
 import AssetManagement.AssetManagement.entity.User;
+import AssetManagement.AssetManagement.enums.TicketDepartment;
 import AssetManagement.AssetManagement.enums.TicketStatus;
 import AssetManagement.AssetManagement.enums.TicketCategory;
 import jakarta.persistence.criteria.JoinType;
@@ -118,6 +119,27 @@ public class TicketsSpecification {
             }
         };
     }
+
+//    public static Specification<Ticket> hasDepartment(TicketDepartment department) {
+//        return (root, query, cb) -> {
+//            if (department == null)
+//                return null;
+//            return cb.equal(root.get("ticketDepartment"), department);
+//        };
+//    }
+
+    public static Specification<Ticket> hasDepartment(TicketDepartment department) {
+        return (root, query, cb) -> {
+            if (department == null) {
+//                System.out.println("No department filter applied");
+                return null;
+            }
+//            System.out.println("Applying filter on department: " + department);
+            return cb.equal(root.get("ticketDepartment"), department);
+        };
+    }
+
+
 
 
 }

@@ -513,7 +513,7 @@ public class UserAssetController {
             @RequestParam(required = false) Long siteIdLocationId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        System.out.println("Request received ");
+//        System.out.println("Request received ");
         return ticketService.filterTickets(title, status, category, employeeId, locationId, assigneeId, createdAfter, createdBefore,search,siteIdLocationId, page, size);
     }
 
