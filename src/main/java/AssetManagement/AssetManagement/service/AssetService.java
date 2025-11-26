@@ -397,46 +397,14 @@ public class AssetService {
 
         @Transactional
         public AssetDTO saveAsset(Asset asset) {
-//            log.debug("Attempting to save asset: {}", asset);
-
-            // Validate uniqueness before saving
             validateUniqueFields(asset);
-//            log.debug("Validation passed for asset: {}", asset.getName());
-
             String createdBy = AuthUtils.getAuthenticatedUserExactName();
             asset.setCreatedBy(createdBy);
             asset.setCreatedAt(LocalDateTime.now());
-
-//            log.debug("Setting createdBy={} and createdAt={} for asset", createdBy, asset.getCreatedAt());
-
             Asset savedAsset = assetRepository.save(asset);
-//            log.debug("Asset saved with ID: {}", savedAsset.getId());
-
             AssetDTO dto = convertAssetToDto(savedAsset);
-//            log.debug("Converted Asset to DTO: {}", dto);
-
             return dto;
         }
-
-//    @Transactional
-//    public List<AssetDTO> saveAssetsBulk(List<Asset> assets) {
-//        List<AssetDTO> result = new ArrayList<>();
-//
-//        for (Asset asset : assets) {
-//            try {
-//                validateUniqueFields(asset); // Optional: skip or collect invalids
-//                asset.setCreatedBy(AuthUtils.getAuthenticatedUserExactName());
-//                asset.setCreatedAt(LocalDateTime.now());
-//
-//                Asset saved = assetRepository.save(asset);
-//                result.add(convertAssetToDto(saved));
-//            } catch (Exception e) {
-//                log.warn("Failed to save asset: {}, reason: {}", asset.getName(), e.getMessage());
-//            }
-//        }
-//
-//        return result;
-//    }
 
     @Transactional
     public List<AssetDTO> saveAssetsBulk(List<AssetDTO> assetDtos) {
@@ -478,7 +446,6 @@ public class AssetService {
     }
 
 
-
     private void validateUniqueFields(Asset asset) {
             Optional<Asset> existingBySerial = assetRepository.findBySerialNumber(asset.getSerialNumber());
             if (existingBySerial.isPresent() && !existingBySerial.get().getId().equals(asset.getId())) {
@@ -489,7 +456,7 @@ public class AssetService {
             if (existingByTag.isPresent() && !existingByTag.get().getId().equals(asset.getId())) {
                 throw new IllegalArgumentException("Asset Tag must be unique. Duplicate found!");
             }
-        }
+    }
 
     // Retrieve an asset by ID
     public Optional<AssetDTO> getAssetById(String assetTag) {
@@ -659,99 +626,295 @@ public class AssetService {
                 .collect(Collectors.toList());
     }
     // Assign an asset to a user
+//    @Transactional
+//    public AssetDTO assignAssetToUser(String assetTag, CheckOutDTO checkOutDTO) {
+//        // 🔍 Fetch asset from DB
+//        Asset asset = findAssetById(assetTag);
+//        String modifiedBy = AuthUtils.getAuthenticatedUserExactName();
+//
+//        // 🚨 Validate if asset is already assigned
+//        if (asset.getAssignedUser() != null) {
+//            throw new IllegalStateException(
+//                    String.format("Asset ID %d is already assigned to %s", assetTag, asset.getAssignedUser().getUsername())
+//            );
+//        }
+//
+//        // 🔍 Fetch user from DTO
+//        User assignedUser = checkOutDTO.getAssignedTo();
+//
+//        if (assignedUser == null || !checkOutDTO.isAssignedToLocation()) {
+//            throw new IllegalArgumentException("Assigned user or Location not found to assign.");
+//        }
+//
+//        // 🚀 Capture changes before updating
+//        trackAssignmentChanges(asset, assignedUser, checkOutDTO, modifiedBy);
+//
+//        // 🛠 Update asset details
+////        asset.setAssignedUser(assignedUser);
+////        asset.setStatus(AssetStatus.CHECKED_OUT);
+//
+//        if(assignedUser != null){
+//            asset.setAssignedUser(assignedUser);
+//        }else (checkOutDTO.isAssignedToLocation()){
+//            asset.setStatus(AssetStatus.ASSIGNED_TO_LOCATION);
+//        }
+//        asset.setStatusNote(checkOutDTO.getCheckOutNote());
+//        asset.setLocation(checkOutDTO.getLocation());
+//        asset.setSite(checkOutDTO.getSite());
+//        asset.setDepartment(checkOutDTO.getDepartment());
+//
+//        // 💾 Save changes
+//        Asset updatedAsset = assetRepository.save(asset);
+//
+//        // 🔄 Convert to DTO & return
+//        return convertAssetToDto(updatedAsset);
+//    }
+
     @Transactional
     public AssetDTO assignAssetToUser(String assetTag, CheckOutDTO checkOutDTO) {
+
+
         // 🔍 Fetch asset from DB
         Asset asset = findAssetById(assetTag);
         String modifiedBy = AuthUtils.getAuthenticatedUserExactName();
 
-        // 🚨 Validate if asset is already assigned
+        // 🚨 Validate if asset is already assigned to a user
         if (asset.getAssignedUser() != null) {
             throw new IllegalStateException(
-                    String.format("Asset ID %d is already assigned to %s", assetTag, asset.getAssignedUser().getUsername())
+                    String.format("Asset %s is already assigned to %s",
+                            assetTag, asset.getAssignedUser().getUsername())
             );
         }
-
-        // 🔍 Fetch user from DTO
-        User assignedUser = checkOutDTO.getAssignedTo();
-        if (assignedUser == null) {
-            throw new IllegalArgumentException("Assigned user cannot be null.");
+        if(asset.getStatus() == AssetStatus.ASSIGNED_TO_LOCATION){
+            throw new AssetNotFoundException("Asset Already Assigned to location ");
         }
 
-        // 🚀 Capture changes before updating
+        // 🔍 From DTO
+        User assignedUser = checkOutDTO.getAssignedTo();
+        boolean assignedToLocation = checkOutDTO.isAssignedToLocation();
+
+        // 👉 Must choose exactly one mode
+        if (assignedUser == null && !assignedToLocation) {
+            throw new IllegalArgumentException("Either assigned user must be present or assignedToLocation must be true.");
+        }
+        if (assignedUser != null && assignedToLocation) {
+            throw new IllegalArgumentException("Asset cannot be assigned to both user and location at the same time.");
+        }
+
+        // 🚀 Track changes (before mutating)
+
         trackAssignmentChanges(asset, assignedUser, checkOutDTO, modifiedBy);
 
         // 🛠 Update asset details
-        asset.setAssignedUser(assignedUser);
-        asset.setStatus(AssetStatus.CHECKED_OUT);
+        if (assignedUser != null) {
+            // Case 1: assign to user
+            asset.setAssignedUser(assignedUser);
+            asset.setStatus(AssetStatus.CHECKED_OUT);
+        } else {
+            // Case 2: assign to location only
+            asset.setAssignedUser(null);
+            asset.setStatus(AssetStatus.ASSIGNED_TO_LOCATION);
+        }
+
         asset.setStatusNote(checkOutDTO.getCheckOutNote());
         asset.setLocation(checkOutDTO.getLocation());
         asset.setSite(checkOutDTO.getSite());
         asset.setDepartment(checkOutDTO.getDepartment());
 
-        // 💾 Save changes
+        // 💾 Save
         Asset updatedAsset = assetRepository.save(asset);
 
-        // 🔄 Convert to DTO & return
         return convertAssetToDto(updatedAsset);
     }
 
+
+//    private void trackAssignmentChanges(Asset asset, User userDetails, CheckOutDTO checkOutDTO, String modifiedBy) {
+//
+//        // Fetch user details safely
+//        User newUser = userRepository.findById(userDetails.getId())
+//                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userDetails.getId()));
+//
+//        // Fetch location details safely
+//        Location newLocation = checkOutDTO.getLocation() != null
+//                ? locationRepository.findById(checkOutDTO.getLocation().getId())
+//                .orElseThrow(() -> new IllegalArgumentException("Location not found with ID: " + checkOutDTO.getLocation().getId()))
+//                : null;
+//
+//        // Track assigned user change
+//        assetHistoryService.saveAssetHistory(asset, "assignedUser",
+//                asset.getAssignedUser() != null ? asset.getAssignedUser().getUsername() : "Unassigned",
+//                newUser.getUsername(), modifiedBy);
+//
+//        // Track status change
+//        assetHistoryService.saveAssetHistory(asset, "status",
+//                asset.getStatus().name(), AssetStatus.CHECKED_OUT.name(), modifiedBy);
+//
+//        // Track location change (handle null values properly)
+//        assetHistoryService.saveAssetHistory(asset, "location",
+//                asset.getLocation() != null ? asset.getLocation().getName() : "Unspecified",
+//                newLocation != null ? newLocation.getName() : "Unspecified", modifiedBy);
+//
+//        // Track department change (handle null values properly)
+//        assetHistoryService.saveAssetHistory(asset, "department",
+//                asset.getDepartment() != null ? asset.getDepartment().name() : "Unspecified",
+//                checkOutDTO != null ? String.valueOf(checkOutDTO.getDepartment()) : "Unspecified", modifiedBy);
+//
+//        // Track status note change if present
+//        if (checkOutDTO.getCheckOutNote() != null) {
+//            assetHistoryService.saveAssetHistory(asset, "statusNote",
+//                    asset.getStatusNote() != null ? asset.getStatusNote() : "No previous note",
+//                    checkOutDTO.getCheckOutNote(), modifiedBy);
+//        }
+//    }
+
     private void trackAssignmentChanges(Asset asset, User userDetails, CheckOutDTO checkOutDTO, String modifiedBy) {
 
-        // Fetch user details safely
-        User newUser = userRepository.findById(userDetails.getId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userDetails.getId()));
+        boolean assignedToLocation = checkOutDTO.isAssignedToLocation();
 
-        // Fetch location details safely
-        Location newLocation = checkOutDTO.getLocation() != null
-                ? locationRepository.findById(checkOutDTO.getLocation().getId())
-                .orElseThrow(() -> new IllegalArgumentException("Location not found with ID: " + checkOutDTO.getLocation().getId()))
-                : null;
+        // Resolve new user only if asset is being assigned to a user
+        User newUser = null;
+        if (!assignedToLocation && userDetails != null) {
+            newUser = userRepository.findById(userDetails.getId())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "User not found with ID: " + userDetails.getId()));
+        }
 
-        // Track assigned user change
-        assetHistoryService.saveAssetHistory(asset, "assignedUser",
-                asset.getAssignedUser() != null ? asset.getAssignedUser().getUsername() : "Unassigned",
-                newUser.getUsername(), modifiedBy);
+        // Resolve new location (for both modes, location is required)
+        Location newLocation = null;
+        if (checkOutDTO.getLocation() != null) {
+            newLocation = locationRepository.findById(checkOutDTO.getLocation().getId())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Location not found with ID: " + checkOutDTO.getLocation().getId()));
+        }
 
-        // Track status change
-        assetHistoryService.saveAssetHistory(asset, "status",
-                asset.getStatus().name(), AssetStatus.CHECKED_OUT.name(), modifiedBy);
+        // 1) assignedUser change
+        String oldUser = asset.getAssignedUser() != null
+                ? asset.getAssignedUser().getUsername()
+                : "Unassigned";
 
-        // Track location change (handle null values properly)
-        assetHistoryService.saveAssetHistory(asset, "location",
-                asset.getLocation() != null ? asset.getLocation().getName() : "Unspecified",
-                newLocation != null ? newLocation.getName() : "Unspecified", modifiedBy);
+        String newUserVal = assignedToLocation
+                ? "Assigned to Location"
+                : (newUser != null ? newUser.getUsername() : "Unassigned");
 
-        // Track department change (handle null values properly)
-        assetHistoryService.saveAssetHistory(asset, "department",
-                asset.getDepartment() != null ? asset.getDepartment().name() : "Unspecified",
-                checkOutDTO != null ? String.valueOf(checkOutDTO.getDepartment()) : "Unspecified", modifiedBy);
+        assetHistoryService.saveAssetHistory(
+                asset,
+                "assignedUser",
+                oldUser,
+                newUserVal,
+                modifiedBy
+        );
 
-        // Track status note change if present
+        // 2) status change
+        String targetStatus = assignedToLocation
+                ? AssetStatus.ASSIGNED_TO_LOCATION.name()
+                : AssetStatus.CHECKED_OUT.name();
+
+        assetHistoryService.saveAssetHistory(
+                asset,
+                "status",
+                asset.getStatus() != null ? asset.getStatus().name() : "UNSPECIFIED",
+                targetStatus,
+                modifiedBy
+        );
+
+        // 3) location change
+        String oldLocation = asset.getLocation() != null
+                ? asset.getLocation().getName()
+                : "Unspecified";
+
+        String newLocationVal = newLocation != null
+                ? newLocation.getName()
+                : "Unspecified";
+
+        assetHistoryService.saveAssetHistory(
+                asset,
+                "location",
+                oldLocation,
+                newLocationVal,
+                modifiedBy
+        );
+
+        // 4) department change
+        String oldDept = asset.getDepartment() != null
+                ? asset.getDepartment().name()
+                : "Unspecified";
+
+        String newDept = checkOutDTO.getDepartment() != null
+                ? checkOutDTO.getDepartment().name()
+                : "Unspecified";
+
+        assetHistoryService.saveAssetHistory(
+                asset,
+                "department",
+                oldDept,
+                newDept,
+                modifiedBy
+        );
+
+        // 5) statusNote change
         if (checkOutDTO.getCheckOutNote() != null) {
-            assetHistoryService.saveAssetHistory(asset, "statusNote",
+            assetHistoryService.saveAssetHistory(
+                    asset,
+                    "statusNote",
                     asset.getStatusNote() != null ? asset.getStatusNote() : "No previous note",
-                    checkOutDTO.getCheckOutNote(), modifiedBy);
+                    checkOutDTO.getCheckOutNote(),
+                    modifiedBy
+            );
         }
     }
+
+
+//    @Transactional
+//    public AssetDTO checkInAsset(String assetTag, CheckInDTO checkInDTO) {
+//        String modifiedBy = AuthUtils.getAuthenticatedUserExactName();
+//        // 🔍 Fetch asset from DB
+//        Asset asset = findAssetById(assetTag);
+//
+//        // 🚨 Validate if asset is already checked in
+//        if (asset.getAssignedUser() == null) {
+//            throw new IllegalStateException(String.format("Asset ID %d is not currently assigned to any user.", assetTag));
+//        }
+//
+//        // 🔄 Capture changes before updating
+//        trackCheckInChanges(asset, checkInDTO, modifiedBy);
+//
+//        // 🛠 Clear assignment details & update asset
+//        asset.setAssignedUser(null);
+//        asset.setStatus(AssetStatus.AVAILABLE);
+//        asset.setStatusNote(checkInDTO.getCheckInNote());
+//        asset.setLocation(checkInDTO.getLocation());
+//        asset.setDepartment(checkInDTO.getDepartment());
+//        asset.setSite(checkInDTO.getSite());
+//
+//        // 💾 Save changes
+//        Asset updatedAsset = assetRepository.save(asset);
+//
+//        // 🔄 Convert to DTO & return
+//        return convertAssetToDto(updatedAsset);
+//    }
 
     @Transactional
     public AssetDTO checkInAsset(String assetTag, CheckInDTO checkInDTO) {
         String modifiedBy = AuthUtils.getAuthenticatedUserExactName();
+
         // 🔍 Fetch asset from DB
         Asset asset = findAssetById(assetTag);
 
-        // 🚨 Validate if asset is already checked in
-        if (asset.getAssignedUser() == null) {
-            throw new IllegalStateException(String.format("Asset ID %d is not currently assigned to any user.", assetTag));
+        // 🚨 Validate: asset must be currently assigned (to user or location)
+        if (asset.getStatus() != AssetStatus.CHECKED_OUT
+                && asset.getStatus() != AssetStatus.ASSIGNED_TO_LOCATION) {
+            throw new IllegalStateException(
+                    String.format("Asset %s is not currently checked out (status = %s).",
+                            assetTag, asset.getStatus())
+            );
         }
 
-        // 🔄 Capture changes before updating
+        // 🔄 Capture changes before updating (you may want a dedicated method)
         trackCheckInChanges(asset, checkInDTO, modifiedBy);
 
         // 🛠 Clear assignment details & update asset
-        asset.setAssignedUser(null);
-        asset.setStatus(AssetStatus.AVAILABLE);
+        asset.setAssignedUser(null);               // user cleared in all cases
+        asset.setStatus(AssetStatus.AVAILABLE);    // becomes available in pool
         asset.setStatusNote(checkInDTO.getCheckInNote());
         asset.setLocation(checkInDTO.getLocation());
         asset.setDepartment(checkInDTO.getDepartment());
@@ -763,6 +926,8 @@ public class AssetService {
         // 🔄 Convert to DTO & return
         return convertAssetToDto(updatedAsset);
     }
+
+
 
     private void trackCheckInChanges(Asset asset, CheckInDTO checkInDTO, String modifiedBy) {
         // Fetch location details safely

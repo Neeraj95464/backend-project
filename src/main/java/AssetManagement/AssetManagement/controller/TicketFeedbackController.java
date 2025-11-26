@@ -56,7 +56,7 @@ public class TicketFeedbackController {
             <head><title>Feedback</title></head>
             <body>
                 <h2>Tell us more about your experience</h2>
-                <form method="get" action="https://crack-segment-hobbies-albert.trycloudflare.com/api/feedback/message">
+                <form method="get" action="https://mahavir-asset.duckdns.org:7355/api/feedback/message">
                     <input type="hidden" name="ticketId" value="%d" />
                     <textarea name="message" rows="5" cols="50" placeholder="Write your feedback here..." required></textarea><br/>
                     <button type="submit">Submit</button>

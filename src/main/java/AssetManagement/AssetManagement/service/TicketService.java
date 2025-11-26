@@ -669,7 +669,7 @@ public class TicketService {
             <body>
                 <h2>Thanks for rating!</h2>
                 <p>We’d really appreciate it if you could tell us more:</p>
-                <form method='post' action='https://mahavir-asset.duckdns.org/api/feedback/message'>
+                <form method='post' action='https://mahavir-asset.duckdns.org:7355/api/feedback/message'>
                     <input type='hidden' name='ticketId' value='%d'/>
                     <textarea name='message' placeholder='Your feedback' required></textarea><br/>
                     <button type='submit'>Submit Message</button>
@@ -685,7 +685,7 @@ public class TicketService {
 
 
     public String generateFeedbackEmailHtml(Long ticketId) {
-        String feedbackApiUrl = "https://mahavir-asset.duckdns.org/api/feedback"; // Update with real domain in prod
+        String feedbackApiUrl = "https://mahavir-asset.duckdns.org:7355/api/feedback"; // Update with real domain in prod
 
         return """
     <!DOCTYPE html>
@@ -1916,20 +1916,37 @@ public class TicketService {
             throw new RuntimeException("User role not set. Access denied.");
         }
 
-        if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("HR_ADMIN")) {
-            // Admins see all tickets; no department filter
-//            System.out.println("User is admin - no department filter applied.");
+//        if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("HR_ADMIN")) {
+//            // Admins see all tickets; no department filter
+////            System.out.println("User is admin - no department filter applied.");
+//
+//            if (user.getDepartment() == null) {
+//                throw new RuntimeException("User department not specified.");
+//            }
+//
+//            // Map to TicketDepartment safely or do string compare
+//            TicketDepartment userDept = TicketDepartment.valueOf(user.getDepartment().name());
+//
+//            deptSpec = TicketsSpecification.hasDepartment(userDept);
+////            System.out.println("Department filter applied: " + userDept);
+//        }
 
+        if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("HR_ADMIN")) {
             if (user.getDepartment() == null) {
                 throw new RuntimeException("User department not specified.");
             }
 
-            // Map to TicketDepartment safely or do string compare
             TicketDepartment userDept = TicketDepartment.valueOf(user.getDepartment().name());
 
-            deptSpec = TicketsSpecification.hasDepartment(userDept);
-//            System.out.println("Department filter applied: " + userDept);
-        } else {
+            if (userDept == TicketDepartment.IT) {
+                // Special case: user is from IT, exclude HR department tickets
+                deptSpec = (root, query, cb) -> cb.notEqual(root.get("ticketDepartment"), TicketDepartment.HR);
+            } else {
+                // For other departments including HR, filter by their department only
+                deptSpec = TicketsSpecification.hasDepartment(userDept);
+            }
+        }
+        else {
             if (user.getDepartment() == null) {
                 throw new RuntimeException("User department not specified.");
             }
@@ -2034,20 +2051,37 @@ public class TicketService {
             throw new RuntimeException("User role not set. Access denied.");
         }
 
-        if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("HR_ADMIN")) {
-            // Admins see all tickets; no department filter
-//            System.out.println("User is admin - no department filter applied.");
+//        if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("HR_ADMIN")) {
+//            // Admins see all tickets; no department filter
+////            System.out.println("User is admin - no department filter applied.");
+//
+//            if (user.getDepartment() == null) {
+//                throw new RuntimeException("User department not specified.");
+//            }
+//
+//            // Map to TicketDepartment safely or do string compare
+//            TicketDepartment userDept = TicketDepartment.valueOf(user.getDepartment().name());
+//
+//            deptSpec = TicketsSpecification.hasDepartment(userDept);
+////            System.out.println("Department filter applied: " + userDept);
+//        }
 
+        if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("HR_ADMIN")) {
             if (user.getDepartment() == null) {
                 throw new RuntimeException("User department not specified.");
             }
 
-            // Map to TicketDepartment safely or do string compare
             TicketDepartment userDept = TicketDepartment.valueOf(user.getDepartment().name());
 
-            deptSpec = TicketsSpecification.hasDepartment(userDept);
-//            System.out.println("Department filter applied: " + userDept);
-        } else {
+            if (userDept == TicketDepartment.IT) {
+                // Special case: user is from IT, exclude HR department tickets
+                deptSpec = (root, query, cb) -> cb.notEqual(root.get("ticketDepartment"), TicketDepartment.HR);
+            } else {
+                // For other departments including HR, filter by their department only
+                deptSpec = TicketsSpecification.hasDepartment(userDept);
+            }
+        }
+        else {
             if (user.getDepartment() == null) {
                 throw new RuntimeException("User department not specified.");
             }

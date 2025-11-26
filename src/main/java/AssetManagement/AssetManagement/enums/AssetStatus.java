@@ -9,6 +9,6 @@ public enum AssetStatus {
     LOST,
     DISPOSED,
      // This status will trigger the need for a repair note
-
+    ASSIGNED_TO_LOCATION,
     DELETED;
 }

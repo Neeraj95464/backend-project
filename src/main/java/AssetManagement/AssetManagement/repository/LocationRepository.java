@@ -1,6 +1,7 @@
 package AssetManagement.AssetManagement.repository;
 
 import AssetManagement.AssetManagement.entity.Location;
+import AssetManagement.AssetManagement.entity.Site;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -13,4 +14,5 @@ public interface LocationRepository extends JpaRepository<Location, Long> {
     List<Location> findByNameContainingIgnoreCase(String name);
     Optional<Location> findById(Long id);
     Optional<Location> findByName(String name);
+    Optional<Location> findByNameAndSite(String name, Site site);
 }

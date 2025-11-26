@@ -9,6 +9,7 @@ import AssetManagement.AssetManagement.enums.Department;
 import AssetManagement.AssetManagement.exception.AssetNotFoundException;
 import AssetManagement.AssetManagement.repository.AssetHistoryRepository;
 import AssetManagement.AssetManagement.repository.AssetRepository;
+import AssetManagement.AssetManagement.service.AssetImportService;
 import AssetManagement.AssetManagement.service.AssetService;
 import AssetManagement.AssetManagement.util.AssetSpecification;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,6 +35,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -47,11 +49,13 @@ public class AssetController {
     private final AssetService assetService;
     private final AssetHistoryRepository assetHistoryRepository;
     private final AssetRepository assetRepository;
+    private final AssetImportService assetImportService;
 
-    public AssetController(AssetService assetService, AssetHistoryRepository assetHistoryRepository, AssetRepository assetRepository) {
+    public AssetController(AssetService assetService, AssetHistoryRepository assetHistoryRepository, AssetRepository assetRepository, AssetImportService assetImportService) {
         this.assetService = assetService;
         this.assetHistoryRepository = assetHistoryRepository;
         this.assetRepository = assetRepository;
+        this.assetImportService = assetImportService;
     }
 
 
@@ -197,7 +201,6 @@ public ResponseEntity<PaginatedResponse<AssetDTO>> getAllAssets(
 
             try {
                 AssetDTO savedAsset = assetService.saveAsset(asset);
-//                log.debug("Asset created successfully: {}", savedAsset);
                 return ResponseEntity.status(HttpStatus.CREATED).body(savedAsset);
             } catch (IllegalArgumentException e) {
 //                log.warn("Invalid asset data provided: {}", e.getMessage());
@@ -207,6 +210,18 @@ public ResponseEntity<PaginatedResponse<AssetDTO>> getAllAssets(
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
         }
+
+    @PostMapping("/import")
+    public ResponseEntity<AssetImportResult> importAssets(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(new AssetImportResult(0, 0,
+                            List.of(new RowError(0, "Uploaded file is empty"))));
+        }
+
+        AssetImportResult result = assetImportService.importAssetsFromExcel(file);
+        return ResponseEntity.ok(result);
+    }
 
 //    @PostMapping("/bulk")
 //    public ResponseEntity<List<AssetDTO>> createAssetsBulk(@RequestBody List<Asset> assets) {
@@ -423,27 +438,60 @@ public ResponseEntity<PaginatedResponse<AssetDTO>> getAllAssets(
         }
     }
 
+//    @PostMapping("/{assetTag}/checkout")
+//    public ResponseEntity<String> checkOutAsset(
+//            @PathVariable String assetTag,
+//            @RequestBody CheckOutDTO checkOutDTO) {
+//
+////        System.out.println("Came to assign "+checkOutDTO);
+//
+//        try {
+//            // Assign the asset using CheckOutDTO
+//            AssetDTO assignedAsset = assetService.assignAssetToUser(assetTag, checkOutDTO);
+//
+//            return ResponseEntity.ok(
+//                    "Asset checked out successfully to " + checkOutDTO.getAssignedTo().getUsername()
+//            );
+//        } catch (IllegalStateException e) {
+//            return ResponseEntity.badRequest().body(e.getMessage());
+//        } catch (RuntimeException e) {
+//            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Asset or User not found."+e);
+//        } catch (Exception e) {
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred while checking out the asset.");
+//        }
+//    }
+
     @PostMapping("/{assetTag}/checkout")
     public ResponseEntity<String> checkOutAsset(
             @PathVariable String assetTag,
             @RequestBody CheckOutDTO checkOutDTO) {
 
         try {
-            // Assign the asset using CheckOutDTO
             AssetDTO assignedAsset = assetService.assignAssetToUser(assetTag, checkOutDTO);
 
-            return ResponseEntity.ok(
-                    "Asset checked out successfully to " + checkOutDTO.getAssignedTo().getUsername()
-            );
+            boolean assignedToLocation = checkOutDTO.isAssignedToLocation();
+
+            String message;
+            if (!assignedToLocation && checkOutDTO.getAssignedTo() != null) {
+                message = "Asset checked out successfully to user "
+                        + checkOutDTO.getAssignedTo().getUsername();
+            } else {
+                message = "Asset checked out successfully to location.";
+            }
+
+            return ResponseEntity.ok(message);
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Asset or User not found.");
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(" " + e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred while checking out the asset.");
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("An error occurred while checking out the asset.");
         }
     }
-
 
 
     @GetMapping("/assets/cost-by-category")

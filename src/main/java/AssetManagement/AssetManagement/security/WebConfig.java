@@ -19,9 +19,9 @@ public class WebConfig {
         config.setAllowedOrigins(List.of(
                 "http://localhost:5173",
                 "https://mahavir-asset.netlify.app",
-                "https://*.ngrok-free.app",
-                "https://innocent-centrally-dodo.ngrok-free.app",
-                "https://engage-commodities-except-harbour.trycloudflare.com"
+                "https://mahavir-asset.duckdns.org:7355",
+                "https://mahavir-asset.pages.dev",
+                "https://helpdesk.mahavirgroup.co"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
