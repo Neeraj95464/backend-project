@@ -56,7 +56,19 @@
 			<scope>runtime</scope>
 		</dependency>
 
-<!--		<dependency>-->
+		<dependency>
+			<groupId>com.google.zxing</groupId>
+			<artifactId>core</artifactId>
+			<version>3.5.1</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.zxing</groupId>
+			<artifactId>javase</artifactId>
+			<version>3.5.1</version>
+		</dependency>
+
+
+		<!--		<dependency>-->
 <!--			<groupId>org.mapstruct</groupId>-->
 <!--			<artifactId>mapstruct</artifactId>-->
 <!--			<version>1.5.5.Final</version> &lt;!&ndash; or latest stable &ndash;&gt;-->

@@ -25,6 +25,7 @@ public enum TicketCategory {
     XENTRY,
     WORKSHOP_DIAGNOSTIC_TOOLS,
     PRINTER,
+    ZOHO_SUPPORT,
 
 
 

@@ -1916,21 +1916,6 @@ public class TicketService {
             throw new RuntimeException("User role not set. Access denied.");
         }
 
-//        if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("HR_ADMIN")) {
-//            // Admins see all tickets; no department filter
-////            System.out.println("User is admin - no department filter applied.");
-//
-//            if (user.getDepartment() == null) {
-//                throw new RuntimeException("User department not specified.");
-//            }
-//
-//            // Map to TicketDepartment safely or do string compare
-//            TicketDepartment userDept = TicketDepartment.valueOf(user.getDepartment().name());
-//
-//            deptSpec = TicketsSpecification.hasDepartment(userDept);
-////            System.out.println("Department filter applied: " + userDept);
-//        }
-
         if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("HR_ADMIN")) {
             if (user.getDepartment() == null) {
                 throw new RuntimeException("User department not specified.");
@@ -1938,13 +1923,44 @@ public class TicketService {
 
             TicketDepartment userDept = TicketDepartment.valueOf(user.getDepartment().name());
 
+//            if (userDept == TicketDepartment.IT) {
+//                // Special case: user is from IT, exclude HR department tickets
+//                deptSpec = (root, query, cb) -> cb.notEqual(root.get("ticketDepartment"), TicketDepartment.HR);
+//            } else {
+//                // For other departments including HR, filter by their department only
+//                deptSpec = TicketsSpecification.hasDepartment(userDept);
+//            }
+
             if (userDept == TicketDepartment.IT) {
-                // Special case: user is from IT, exclude HR department tickets
-                deptSpec = (root, query, cb) -> cb.notEqual(root.get("ticketDepartment"), TicketDepartment.HR);
+
+                // IT can see all except HR
+                deptSpec = (root, query, cb) ->
+                        cb.notEqual(root.get("ticketDepartment"), TicketDepartment.HR);
+
+            } else if (userDept == TicketDepartment.HR) {
+
+                // HR & HR_ADMIN RULE:
+                // 1. HR department tickets
+                // 2. IT department UNASSIGNED tickets
+
+                deptSpec = (root, query, cb) -> cb.or(
+
+                        // HR tickets
+                        cb.equal(root.get("ticketDepartment"), TicketDepartment.HR),
+
+                        // IT UNASSIGNED tickets
+                        cb.and(
+                                cb.equal(root.get("ticketDepartment"), TicketDepartment.IT),
+                                cb.isNull(root.get("assignee"))
+                        )
+                );
+
             } else {
-                // For other departments including HR, filter by their department only
+
+                // Other departments: see only own department
                 deptSpec = TicketsSpecification.hasDepartment(userDept);
             }
+
         }
         else {
             if (user.getDepartment() == null) {
@@ -2051,21 +2067,6 @@ public class TicketService {
             throw new RuntimeException("User role not set. Access denied.");
         }
 
-//        if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("HR_ADMIN")) {
-//            // Admins see all tickets; no department filter
-////            System.out.println("User is admin - no department filter applied.");
-//
-//            if (user.getDepartment() == null) {
-//                throw new RuntimeException("User department not specified.");
-//            }
-//
-//            // Map to TicketDepartment safely or do string compare
-//            TicketDepartment userDept = TicketDepartment.valueOf(user.getDepartment().name());
-//
-//            deptSpec = TicketsSpecification.hasDepartment(userDept);
-////            System.out.println("Department filter applied: " + userDept);
-//        }
-
         if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("HR_ADMIN")) {
             if (user.getDepartment() == null) {
                 throw new RuntimeException("User department not specified.");
@@ -2092,20 +2093,6 @@ public class TicketService {
             deptSpec = TicketsSpecification.hasDepartment(userDept);
 //            System.out.println("Department filter applied: " + userDept);
         }
-
-
-
-//        Specification<Ticket> spec = Specification.where(TicketsSpecification.hasTitle(title))
-//                .and(TicketsSpecification.hasStatus(status))
-//                .and(TicketsSpecification.hasCategory(category))
-//                .and(TicketsSpecification.hasEmployeeId(employeeId))
-//                .and(TicketsSpecification.hasLocationId(locationId))
-//                .and(TicketsSpecification.hasAssigneeEmployeeId(assigneeId))
-//                .and(TicketsSpecification.createdAfter(createdAfter))
-//                .and(TicketsSpecification.createdBefore(createdBefore))
-//                .and(TicketsSpecification.globalSearch(search))
-//                .and(TicketsSpecification.hasSiteAndLocation(siteIdLocationId,locationId));
-
 
         Specification<Ticket> spec = Specification.where(deptSpec)
                 .and(TicketsSpecification.hasTitle(title))
