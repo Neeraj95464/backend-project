@@ -47,6 +47,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/**").hasAnyRole("ADMIN","HR_ADMIN") // ✅ Only "ADMIN" can manage users
                         .requestMatchers("/api/user-assets/**").hasAnyRole("USER","ADMIN","HR_ADMIN")
                         .requestMatchers("/api/enum/**").hasAnyRole("USER","ADMIN","HR_ADMIN")
+                        .requestMatchers("/api/sim-cards/**").hasAnyRole("USER","ADMIN","HR_ADMIN")
                         .requestMatchers("/api/asset-photos/uploads/**").permitAll()
                         .requestMatchers("/api/asset-documents/uploads/**").permitAll()
                         .requestMatchers("/api/feedback/**").permitAll()

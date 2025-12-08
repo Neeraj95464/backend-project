@@ -28,6 +28,7 @@ import org.springframework.data.domain.Sort;
 
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
@@ -395,16 +396,27 @@ public class AssetService {
 //        }
 
 
-        @Transactional
-        public AssetDTO saveAsset(Asset asset) {
-            validateUniqueFields(asset);
-            String createdBy = AuthUtils.getAuthenticatedUserExactName();
-            asset.setCreatedBy(createdBy);
-            asset.setCreatedAt(LocalDateTime.now());
-            Asset savedAsset = assetRepository.save(asset);
-            AssetDTO dto = convertAssetToDto(savedAsset);
-            return dto;
-        }
+//        @Transactional
+//        public AssetDTO saveAsset(Asset asset) {
+//            validateUniqueFields(asset);
+//            String createdBy = AuthUtils.getAuthenticatedUserExactName();
+//            asset.setCreatedBy(createdBy);
+//            asset.setCreatedAt(LocalDateTime.now());
+//            Asset savedAsset = assetRepository.save(asset);
+//            AssetDTO dto = convertAssetToDto(savedAsset);
+//            return dto;
+//        }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AssetDTO saveAsset(Asset asset) {
+        validateUniqueFields(asset);
+        String createdBy = AuthUtils.getAuthenticatedUserExactName();
+        asset.setCreatedBy(createdBy);
+        asset.setCreatedAt(LocalDateTime.now());
+        Asset savedAsset = assetRepository.save(asset);
+        AssetDTO dto = convertAssetToDto(savedAsset);
+        return dto;
+    }
 
     @Transactional
     public List<AssetDTO> saveAssetsBulk(List<AssetDTO> assetDtos) {
