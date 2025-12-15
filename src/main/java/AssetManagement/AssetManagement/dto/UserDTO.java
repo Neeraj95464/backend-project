@@ -22,6 +22,11 @@ public class UserDTO {
 
     private String password; // Password (ensure it's hashed during storage)
 
+    private String designation;
+    private String aadharNumber;
+    private String panNumber;
+    private String personalEmail;
+
     private String role; // Role (e.g., Admin, User)
 
     private String email; // Email address

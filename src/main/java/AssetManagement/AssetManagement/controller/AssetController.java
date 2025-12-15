@@ -362,6 +362,16 @@ public ResponseEntity<PaginatedResponse<AssetDTO>> getAllAssets(
         }
     }
 
+    @GetMapping("/user/my-asset")
+    public ResponseEntity<List<MyAssetDTO>> myAsset() {
+        try {
+            List<MyAssetDTO> assets = assetService.getMyAsset();
+            return ResponseEntity.ok(assets);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @GetMapping("/location/{locationId}")
     public ResponseEntity<List<AssetDTO>> getAssetsByLocation(@PathVariable Long locationId) {
         try {

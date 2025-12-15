@@ -88,5 +88,13 @@ public class UserController {
     }
 
 
+    @PostMapping("/reset-password/{employeeId}")
+    public ResponseEntity<Void> resetPassword(
+            @PathVariable String employeeId
+    ) {
+        userService.resetPasswordByEmployeeId(employeeId);
+        return ResponseEntity.ok().build();
+    }
+
 
 }

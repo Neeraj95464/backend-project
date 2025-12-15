@@ -1,134 +1,3 @@
-//package AssetManagement.AssetManagement.service;
-//
-//import AssetManagement.AssetManagement.dto.RowError;
-//import AssetManagement.AssetManagement.dto.SimCardRequestDto;
-//import AssetManagement.AssetManagement.dto.SimImportResult;
-//import AssetManagement.AssetManagement.entity.Location;
-//import AssetManagement.AssetManagement.entity.Site;
-//import AssetManagement.AssetManagement.enums.SimProvider;
-//import AssetManagement.AssetManagement.enums.SimStatus;
-//import AssetManagement.AssetManagement.service.SimCardService;
-//import AssetManagement.AssetManagement.repository.LocationRepository;
-//import AssetManagement.AssetManagement.repository.SiteRepository;
-//
-//import jakarta.transaction.Transactional;
-//import lombok.RequiredArgsConstructor;
-//import org.apache.poi.ss.usermodel.*;
-//import org.springframework.stereotype.Service;
-//import org.springframework.web.multipart.MultipartFile;
-//
-//import java.io.InputStream;
-//import java.math.BigDecimal;
-//import java.time.LocalDate;
-//import java.util.ArrayList;
-//import java.util.List;
-//
-//@Service
-//@RequiredArgsConstructor
-//public class SimCardImportService {
-//
-//    private final SimCardService simCardService;
-//    private final SiteRepository siteRepository;
-//    private final LocationRepository locationRepository;
-//
-//    @Transactional
-//    public SimImportResult importSimsFromExcel(MultipartFile file) {
-//
-//        int success = 0;
-//        List<RowError> errors = new ArrayList<>();
-//
-//        try (InputStream is = file.getInputStream();
-//             Workbook workbook = WorkbookFactory.create(is)) {
-//
-//            Sheet sheet = workbook.getSheetAt(0);
-//
-//            // Skip header row
-//            for (int rowIdx = 1; rowIdx <= sheet.getLastRowNum(); rowIdx++) {
-//
-//                Row row = sheet.getRow(rowIdx);
-//                if (row == null) continue;
-//
-//                try {
-//                    SimCardRequestDto req = mapRowToSim(row);
-//                    simCardService.createSimCard(req);
-//                    success++;
-//                } catch (Exception ex) {
-//                    errors.add(new RowError(rowIdx + 1, ex.getMessage()));
-//                }
-//            }
-//        } catch (Exception e) {
-//            errors.add(new RowError(0, "Failed to read file: " + e.getMessage()));
-//        }
-//
-//        return new SimImportResult(success, errors.size(), errors);
-//    }
-//
-//
-//    private SimCardRequestDto mapRowToSim(Row row) {
-//
-//        SimCardRequestDto dto = new SimCardRequestDto();
-//
-//        dto.setPhoneNumber(getStringCell(row, 0));     // Column A
-//        dto.setIccid(getStringCell(row, 1));           // Column B
-//        dto.setImsi(getStringCell(row, 2));            // Column C
-//
-//        String providerStr = getStringCell(row, 3);    // Column D
-//        if (providerStr != null)
-//            dto.setProvider(SimProvider.valueOf(providerStr.trim()));
-//
-//        String statusStr = getStringCell(row, 4);      // Column E
-//        if (statusStr != null)
-//            dto.setStatus(SimStatus.valueOf(statusStr.trim()));
-//
-//        dto.setPurchaseDate(getDateCell(row, 5));      // Column F
-//        dto.setPurchaseFrom(getStringCell(row, 6));    // Column G
-//
-//        String costStr = getStringCell(row, 7);        // Column H
-//        if (costStr != null)
-//            dto.setCost(new BigDecimal(costStr));
-//
-//        String siteName = getStringCell(row, 8);       // Column I
-//        String locationName = getStringCell(row, 9);   // Column J
-//
-//        dto.setSiteName(siteName);
-//        dto.setLocationName(locationName);
-//
-//        // Validate site + location
-//        Site site = siteRepository.findByName(siteName)
-//                .orElseThrow(() -> new RuntimeException("Site not found: " + siteName));
-//        Location location = locationRepository.findByNameAndSite(locationName, site)
-//                .orElseThrow(() -> new RuntimeException("Location '" + locationName + "' not found in site '" + siteName + "'"));
-//
-//        dto.setNote(getStringCell(row, 10));           // Column K (optional)
-//
-//        return dto;
-//    }
-//
-//    private String getStringCell(Row row, int idx) {
-//        Cell cell = row.getCell(idx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-//        if (cell == null) return null;
-//
-//        return switch (cell.getCellType()) {
-//            case STRING -> cell.getStringCellValue().trim();
-//            case NUMERIC -> String.valueOf((long) cell.getNumericCellValue());
-//            default -> null;
-//        };
-//    }
-//
-//    private LocalDate getDateCell(Row row, int idx) {
-//        Cell cell = row.getCell(idx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-//        if (cell == null) return null;
-//
-//        if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell))
-//            return cell.getLocalDateTimeCellValue().toLocalDate();
-//
-//        if (cell.getCellType() == CellType.STRING)
-//            return LocalDate.parse(cell.getStringCellValue().trim());
-//
-//        return null;
-//    }
-//}
-
 
 
 package AssetManagement.AssetManagement.service;
@@ -143,6 +12,7 @@ import AssetManagement.AssetManagement.enums.SimProvider;
 import AssetManagement.AssetManagement.enums.SimStatus;
 import AssetManagement.AssetManagement.exception.UserNotFoundException;
 import AssetManagement.AssetManagement.repository.LocationRepository;
+import AssetManagement.AssetManagement.repository.SimCardRepository;
 import AssetManagement.AssetManagement.repository.SiteRepository;
 
 import AssetManagement.AssetManagement.repository.UserRepository;
@@ -158,6 +28,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -167,6 +38,7 @@ public class SimCardImportService {
     private final SiteRepository siteRepository;
     private final LocationRepository locationRepository;
     private final UserRepository userRepository;
+    private final SimCardRepository simCardRepository;
 
 
     public SimImportResult importSimsFromExcel(MultipartFile file) {
@@ -202,73 +74,19 @@ public class SimCardImportService {
         return new SimImportResult(success, errors.size(), errors);
     }
 
-//    private SimCardRequestDto mapRowToSim(Row row) {
-//
-//        SimCardRequestDto dto = new SimCardRequestDto();
-//
-//        dto.setPhoneNumber(getStringCell(row, 0));
-//        dto.setIccid(getStringCell(row, 1));
-//        dto.setImsi(getStringCell(row, 2));
-//
-//        // provider
-//        String providerStr = getStringCell(row, 3);
-//        if (providerStr != null && !providerStr.isBlank()) {
-//            dto.setProvider(SimProvider.valueOf(providerStr.trim().toUpperCase()));
-//        }
-//
-//        // status
-//        String statusStr = getStringCell(row, 4);
-//        if (statusStr != null && !statusStr.isBlank()) {
-//            dto.setStatus(SimStatus.valueOf(statusStr.trim().toUpperCase()));
-//        }
-//
-//        // activatedAt
-//        dto.setActivatedAt(getDateCell(row, 5));
-//
-//        // purchaseDate
-//        dto.setPurchaseDate(getDateCell(row, 6));
-//
-//        // purchaseFrom
-//        dto.setPurchaseFrom(getStringCell(row, 7));
-//
-//        // cost
-//        dto.setCost(getBigDecimalCell(row, 8));
-//
-//        // note
-//        dto.setNote(getStringCell(row, 9));
-//        System.out.println("Note was "+getStringCell(row,9));
-//
-//        // site + location
-//        String siteName = getStringCell(row, 10);
-//        System.out.println("site name was "+siteName);
-//        String locationName = getStringCell(row, 11);
-//
-//        Site site = siteRepository.findByName(siteName)
-//                .orElseThrow(() -> new RuntimeException("Site not found: " + siteName));
-//
-//        Location location = locationRepository.findByNameAndSite(locationName, site)
-//                .orElseThrow(() -> new RuntimeException(
-//                        "Location '" + locationName + "' not found in site '" + siteName + "'"
-//                ));
-//
-//        dto.setSiteName(siteName);
-//        dto.setLocationName(locationName);
-//
-//        User optionalUser = userRepository
-//                .findByEmployeeId(getStringCell(row, 12))
-//                        .orElseThrow(()->new UserNotFoundException("User not found "));
-//
-//        // assigned user ID (optional)
-//        dto.setAssignedUserId(optionalUser.getId());
-//
-//        return dto;
-//    }
-
     private SimCardRequestDto mapRowToSim(Row row) {
         SimCardRequestDto dto = new SimCardRequestDto();
 
         // ✅ FIXED: Proper column reading (0-based index)
         dto.setPhoneNumber(getStringCell(row, 0));        // A - phoneNumber
+        String phoneNumber = getStringCell(row, 0);
+        if (phoneNumber != null && !phoneNumber.isBlank()) {
+            if (simCardRepository.existsByPhoneNumber(phoneNumber.trim())) {
+                throw new RuntimeException("❌ Duplicate phone number '" + phoneNumber + "' already exists (Row " + (row.getRowNum() + 1) + ")");
+            }
+            dto.setPhoneNumber(phoneNumber.trim());
+        }
+
         dto.setIccid(getStringCell(row, 1));              // B - iccid
         dto.setImsi(getStringCell(row, 2));               // C - imsi
         dto.setProvider(getEnumCell(row, 3, SimProvider.class));  // D - provider
@@ -299,11 +117,28 @@ public class SimCardImportService {
         }
 
         // ✅ Optional user assignment
+//        if (employeeId != null && !employeeId.isBlank()) {
+//
+//            User user = userRepository.findByEmployeeId(employeeId.trim())
+//                    .orElseThrow(() -> new UserNotFoundException("User not found: " + employeeId));
+//            dto.setAssignedUserId(user.getId());
+//        }
+
+
+// ✅ With this auto-create logic:
         if (employeeId != null && !employeeId.isBlank()) {
-            User user = userRepository.findByEmployeeId(employeeId.trim())
-                    .orElseThrow(() -> new UserNotFoundException("User not found: " + employeeId));
-            dto.setAssignedUserId(user.getId());
+            String cleanEmployeeId = employeeId.trim();
+            Optional<User> existingUser = userRepository.findByEmployeeId(cleanEmployeeId);
+
+            if (existingUser.isPresent()) {
+                dto.setAssignedUserId(existingUser.get().getId());
+            } else {
+                // Auto-create missing user
+                Long newUserId = createSystemUserForImport(cleanEmployeeId, row);
+                dto.setAssignedUserId(newUserId);
+            }
         }
+
 
         return dto;
     }
@@ -351,29 +186,6 @@ public class SimCardImportService {
     }
 
 
-//    private String getStringCell(Row row, int index) {
-//        Cell cell = row.getCell(index, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-//        if (cell == null) return null;
-//
-//        cell.setCellType(CellType.STRING); // force convert to string
-//        return cell.getStringCellValue().trim();
-//    }
-//
-//    private BigDecimal getBigDecimalCell(Row row, int index) {
-//        Cell cell = row.getCell(index, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-//        if (cell == null) return null;
-//
-//        try {
-//            if (cell.getCellType() == CellType.NUMERIC) {
-//                return BigDecimal.valueOf(cell.getNumericCellValue());
-//            }
-//            cell.setCellType(CellType.STRING);
-//            return new BigDecimal(cell.getStringCellValue().trim());
-//        } catch (Exception e) {
-//            throw new RuntimeException("Invalid number at column " + (index + 1));
-//        }
-//    }
-
     private LocalDate getDateCell(Row row, int index) {
         Cell cell = row.getCell(index, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
         if (cell == null) return null;
@@ -393,4 +205,33 @@ public class SimCardImportService {
 
         return null;
     }
+
+
+    private Long createSystemUserForImport(String employeeId, Row row) {
+        User systemUser = new User();
+        systemUser.setEmployeeId(employeeId);
+        systemUser.setUsername(employeeId);  // System-generated
+        systemUser.setRole("USER");                   // Default role
+        systemUser.setPhoneNumber(getStringCell(row, 0));  // From SIM phone
+        systemUser.setPersonalEmail(employeeId + "@system.infradesk");  // Temp email
+
+        // ✅ Audit trail in note
+        String siteName = getStringCell(row, 10);
+        String locationName = getStringCell(row, 11);
+        systemUser.setNote(String.format(
+                "🔄 AUTO-CREATED by SIM import | Row %d | Site: %s | Location: %s | UPDATE with real data",
+                row.getRowNum() + 1, siteName, locationName
+        ));
+
+        // Default values
+        systemUser.setDesignation("Employee");
+        systemUser.setDeleted(false);
+        systemUser.setCreatedBy("SYSTEM_IMPORT");
+
+        User savedUser = userRepository.save(systemUser);
+//        log.info("👤 Created system user for employeeId: {} (ID: {})", employeeId, savedUser.getId());
+
+        return savedUser.getId();
+    }
+
 }

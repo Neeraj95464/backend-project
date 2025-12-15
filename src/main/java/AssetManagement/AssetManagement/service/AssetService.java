@@ -51,9 +51,10 @@ public class AssetService {
     private final AssetMapper assetMapper;
     private final LocationRepository locationRepository;
     private final AssetHistoryService assetHistoryService;
+    private final SimCardRepository simCardRepository;
     private static final Logger logger = LoggerFactory.getLogger(AssetService.class);
 
-    public AssetService(AssetRepository assetRepository, UserRepository userRepository, AssetHistoryRepository assetHistoryRepository, SiteRepository siteRepository, AssetMapper assetMapper, LocationRepository locationRepository, AssetHistoryService assetHistoryService) {
+    public AssetService(AssetRepository assetRepository, UserRepository userRepository, AssetHistoryRepository assetHistoryRepository, SiteRepository siteRepository, AssetMapper assetMapper, LocationRepository locationRepository, AssetHistoryService assetHistoryService, SiteRepository simCardRepository, SimCardRepository simCardRepository1) {
         this.assetRepository = assetRepository;
         this.userRepository = userRepository;
         this.assetHistoryRepository = assetHistoryRepository;
@@ -61,6 +62,8 @@ public class AssetService {
         this.assetMapper = assetMapper;
         this.locationRepository = locationRepository;
         this.assetHistoryService = assetHistoryService;
+
+        this.simCardRepository = simCardRepository1;
     }
     public AssetDTO dispose(String assetTag, String statusNote) {
         String modifiedBy=AuthUtils.getAuthenticatedUserExactName();
@@ -637,6 +640,106 @@ public class AssetService {
                 .map(this::convertAssetToDto)
                 .collect(Collectors.toList());
     }
+
+//    public List<AssetDTO> getMyAsset() {
+//
+//        String empId = AuthUtils.getAuthenticatedUsername();
+//
+//        User user = userRepository.findByEmployeeId(empId)
+//                .orElseThrow(()->new UserNotFoundException("User not found "+empId));
+//
+//        return assetRepository.findByAssignedUser(user).stream()
+//                .map(this::convertAssetToDto)
+//                .collect(Collectors.toList());
+//    }
+
+    // In AssetService (or a dedicated MyAssetService)
+    public List<MyAssetDTO> getMyAsset() {
+
+        String empId = AuthUtils.getAuthenticatedUsername();
+
+        User user = userRepository.findByEmployeeId(empId)
+                .orElseThrow(() -> new UserNotFoundException("User not found " + empId));
+
+        // Hardware / normal assets
+        List<MyAssetDTO> hardwareDtos = assetRepository.findByAssignedUser(user).stream()
+                .map(asset -> {
+                    MyAssetDTO dto = new MyAssetDTO();
+                    dto.setAssetTag(asset.getAssetTag());
+                    dto.setAssetType(asset.getAssetType() != null ? asset.getAssetType().name() : "ASSET");
+                    dto.setName(asset.getName());
+                    dto.setIdentifier(asset.getSerialNumber());   // serial number
+                    dto.setProviderOrBrand(asset.getBrand());     // or brand/model combo
+                    dto.setLocationName(
+                            asset.getLocation() != null ? asset.getLocation().getName() : null
+                    );
+                    dto.setSiteName(
+                            asset.getSite() != null ? asset.getSite().getName() : null
+                    );
+                    dto.setStatus(asset.getStatus() != null ? asset.getStatus().name() : null);
+                    dto.setNote(asset.getDescription());
+                    return dto;
+                })
+                .toList();
+
+        // SIM cards (CUG)
+//        List<MyAssetDTO> simDtos = simCardRepository.findByAssignedUser(user).stream()
+//                .map(sim -> {
+//                    MyAssetDTO dto = new MyAssetDTO();
+//                    dto.setAssetTag(sim.getPhoneNumber);                  // or "SIM-" + sim.getId()
+//                    dto.setAssetType("CUG_SIM");
+//                    dto.setName("CUG SIM");
+//                    dto.setIdentifier(sim.getPhoneNumber());          // phone number displayed
+//                    dto.setProviderOrBrand(
+//                            sim.getProvider() != null ? sim.getProvider().name() : null
+//                    );
+//                    dto.setLocationName(
+//                            sim.getLocation() != null ? sim.getLocation().getName() : null
+//                    );
+//                    dto.setSiteName(
+//                            sim.getSite() != null ? sim.getSite().getName() : null
+//                    );
+//                    dto.setStatus(sim.getStatus() != null ? sim.getStatus().name() : null);
+//                    dto.setNote(sim.getNote());
+//                    return dto;
+//                })
+//                .toList();
+
+        List<MyAssetDTO> simDtos = simCardRepository.findByAssignedUser(user).stream()
+                .map(sim -> {
+                    MyAssetDTO dto = new MyAssetDTO();
+
+                    // make sure these methods exist in SimCard: getPhoneNumber(), getProvider(), getLocation() ...
+                    dto.setAssetTag(sim.getPhoneNumber());                 // or "SIM-" + sim.getId()
+                    dto.setAssetType("CUG_SIM");
+                    dto.setName("CUG SIM");
+                    dto.setIdentifier(sim.getPhoneNumber());               // phone number displayed
+                    dto.setProviderOrBrand(
+                            sim.getProvider() != null ? sim.getProvider().name() : null
+                    );
+                    dto.setLocationName(
+                            sim.getLocation() != null ? sim.getLocation().getName() : null
+                    );
+                    dto.setSiteName(
+                            sim.getSite() != null ? sim.getSite().getName() : null
+                    );
+                    dto.setStatus(sim.getStatus() != null ? sim.getStatus().name() : null);
+                    dto.setNote(sim.getNote());
+                    return dto;
+                })
+                .toList();
+
+
+        // Merge both lists
+        List<MyAssetDTO> result = new ArrayList<>();
+        result.addAll(hardwareDtos);
+        result.addAll(simDtos);
+
+        return result;
+    }
+
+
+
     // Assign an asset to a user
 //    @Transactional
 //    public AssetDTO assignAssetToUser(String assetTag, CheckOutDTO checkOutDTO) {

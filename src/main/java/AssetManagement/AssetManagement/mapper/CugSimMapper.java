@@ -17,8 +17,9 @@ public class CugSimMapper {
         r.setStatus(s.getStatus());
 
         if (s.getAssignedUser() != null) {
-            r.setAssignedUserId(s.getAssignedUser().getId());
+            r.setAssignedUserId(s.getAssignedUser().getEmployeeId());
             r.setAssignedUserName(s.getAssignedUser().getUsername());
+            r.setAssigneeDesignation(s.getAssignedUser().getDesignation());
         }
 
         r.setAssignedAt(s.getAssignedAt());

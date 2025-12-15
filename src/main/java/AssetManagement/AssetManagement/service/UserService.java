@@ -3,10 +3,13 @@ package AssetManagement.AssetManagement.service;
 import AssetManagement.AssetManagement.dto.PaginatedResponse;
 import AssetManagement.AssetManagement.dto.UserDTO;
 import AssetManagement.AssetManagement.entity.User;
+import AssetManagement.AssetManagement.exception.UserNotFoundException;
 import AssetManagement.AssetManagement.repository.UserRepository;
 import AssetManagement.AssetManagement.util.AuthUtils;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -88,6 +91,15 @@ public class UserService {
         // Assign default role
         user.setRole("USER");
 
+        if(user.getEmail()==null && user.getPersonalEmail()== null){
+            throw new RuntimeException("Both email value can't be null ");
+        }
+        if(user.getEmail() == null){
+            user.setEmail(user.getPersonalEmail());
+            user.setNote(user.getNote() + "Personal email is saved in professional email " +
+                    "pls update the professional one if there allocated ");
+        }
+
         // Save the user
         User savedUser = userRepository.save(user);
 
@@ -116,6 +128,10 @@ public class UserService {
         existingUser.setUsername(userDto.getUsername());
         existingUser.setRole(userDto.getRole());
         existingUser.setEmail(userDto.getEmail());
+        existingUser.setPanNumber(userDto.getPanNumber());
+        existingUser.setDesignation(userDto.getDesignation());
+        existingUser.setAadharNumber(userDto.getAadharNumber());
+        existingUser.setPersonalEmail(userDto.getPersonalEmail());
         existingUser.setPhoneNumber(String.valueOf(userDto.getPhoneNumber()));
         existingUser.setDepartment(userDto.getDepartment());
         existingUser.setNote(userDto.getNote());
@@ -148,6 +164,10 @@ public class UserService {
         dto.setId(user.getId());
         dto.setUsername(user.getUsername());
         dto.setRole(user.getRole());
+        dto.setDesignation(user.getDesignation());
+        dto.setAadharNumber(user.getAadharNumber());
+        dto.setPanNumber(user.getPanNumber());
+        dto.setPersonalEmail(user.getPersonalEmail());
         dto.setEmployeeId(user.getEmployeeId());
         dto.setEmail(user.getEmail());
         dto.setPhoneNumber(user.getPhoneNumber());
@@ -156,12 +176,6 @@ public class UserService {
         dto.setLocation(user.getLocation());
         dto.setSite(user.getSite());
         dto.setSerialNumbers(null);
-
-        // Ensure assigned assets are correctly mapped as a List<Asset>
-//        dto.setSerialNumbers(Optional.ofNullable(user.getAssignedAssets())
-//                .orElse(Collections.emptyList())
-//                .stream()
-//                .collect(Collectors.toList())); // Keep it as List<Asset>
 
         return dto;
     }
@@ -180,4 +194,28 @@ public class UserService {
         user.setSite(dto.getSite());
         return user;
     }
+
+
+        public void resetPasswordByEmployeeId(String employeeId) {
+            // 1) check current user is ADMIN
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || auth.getAuthorities().stream().noneMatch(
+                    a -> a.getAuthority().equals("ROLE_ADMIN")
+            )) {
+                throw new SecurityException("Only ADMIN can reset passwords");
+            }
+
+            // 2) find target user by employeeId
+            User user = userRepository.findByEmployeeId(employeeId)
+                    .orElseThrow(() -> new UserNotFoundException("User not found: " + employeeId));
+
+            // 3) set static password "test" (encoded)
+            String encoded = passwordEncoder.encode("test");
+            user.setPassword(encoded);
+
+            System.out.println("Saving new password "+user.getEmployeeId()+" "+user.getPassword());
+
+            // 4) save
+            userRepository.save(user);
+        }
 }

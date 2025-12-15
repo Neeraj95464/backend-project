@@ -2,6 +2,7 @@
 package AssetManagement.AssetManagement.repository;
 
 import AssetManagement.AssetManagement.entity.SimCard;
+import AssetManagement.AssetManagement.entity.User;
 import AssetManagement.AssetManagement.enums.SimStatus;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
@@ -20,7 +21,7 @@ public interface SimCardRepository extends JpaRepository<SimCard, Long>, JpaSpec
 //    Optional<SimCard> findBySimTag(String simTag);
     Optional<SimCard> findByPhoneNumber(String phoneNumber);
     List<SimCard> findByStatus(SimStatus status);
-
+    List<SimCard> findByAssignedUser(User assignedUser);
 
     default Page<SimCard> filterSims(
             String phoneNumber,
@@ -105,4 +106,6 @@ public interface SimCardRepository extends JpaRepository<SimCard, Long>, JpaSpec
             return cb.and(predicates.toArray(new Predicate[0]));
         }, pageable);
     }
+
+    boolean existsByPhoneNumber(String trim);
 }

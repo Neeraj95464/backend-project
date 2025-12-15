@@ -27,14 +27,20 @@ public class User {
 
     private String password; // Ensure secure storage (e.g., hashed passwords)
 
+    @Nonnull
+    @Column(unique = true)
     private String employeeId;
 
     private String role;
 
     private String phoneNumber;
 
-    @Nonnull
     private String email;
+
+    private String personalEmail;
+    private String aadharNumber;
+    private String panNumber;
+    private String designation;
 
     @Enumerated(EnumType.STRING)
     private Department department;

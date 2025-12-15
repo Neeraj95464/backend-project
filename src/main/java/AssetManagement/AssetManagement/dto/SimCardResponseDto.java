@@ -21,7 +21,8 @@ public class SimCardResponseDto {
     private String imsi;
     private SimProvider provider;
     private SimStatus status;
-    private Long assignedUserId;
+    private String assignedUserId;
+    private String assigneeDesignation;
     private String assignedUserName;
     private LocalDateTime assignedAt;
     private LocalDate activatedAt;

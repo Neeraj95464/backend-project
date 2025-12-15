@@ -111,8 +111,28 @@ public class TicketService {
 
         ticket.setLocation(location);
 
-        User employeeUser = userRepository.findByEmployeeId(ticketDTO.getEmployee().getEmployeeId())
-                .orElseThrow(() -> new EntityNotFoundException("Employee not found"));
+//        User employeeUser = userRepository.findByEmployeeId(ticketDTO.getEmployee().getEmployeeId())
+//                .orElseThrow(() -> new EntityNotFoundException("Employee not found"));
+//        employeeUser = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername());
+//        ticket.setEmployee(employeeUser);
+
+        // In your createTicket method:
+        User employeeUser = null;
+
+// Method 1: Onboarding employee (preferred)
+        if (ticketDTO.getEmployee() != null && ticketDTO.getEmployee().getEmployeeId() != null) {
+            employeeUser = userRepository.findByEmployeeId(ticketDTO.getEmployee().getEmployeeId()).orElse(null);
+        }
+
+// Method 2: Current user fallback
+        if (employeeUser == null) {
+            employeeUser = userRepository.findByEmployeeId(AuthUtils.getAuthenticatedUsername()).orElse(null);
+        }
+
+        if (employeeUser == null) {
+            throw new EntityNotFoundException("Employee not found. Create user first via onboarding.");
+        }
+
         ticket.setEmployee(employeeUser);
 
         assetRepository.findByAssetTag(ticketDTO.getAssetTag()).ifPresent(ticket::setAsset);

@@ -26,6 +26,7 @@ public enum TicketCategory {
     WORKSHOP_DIAGNOSTIC_TOOLS,
     PRINTER,
     ZOHO_SUPPORT,
+    CUG_SIM,
 
 
 
