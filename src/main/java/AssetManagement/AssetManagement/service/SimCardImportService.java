@@ -131,10 +131,10 @@ public class SimCardImportService {
             Optional<User> existingUser = userRepository.findByEmployeeId(cleanEmployeeId);
 
             if (existingUser.isPresent()) {
-                dto.setAssignedUserId(existingUser.get().getId());
+                dto.setAssignedUserId(existingUser.get().getEmployeeId());
             } else {
                 // Auto-create missing user
-                Long newUserId = createSystemUserForImport(cleanEmployeeId, row);
+                String newUserId = createSystemUserForImport(cleanEmployeeId, row);
                 dto.setAssignedUserId(newUserId);
             }
         }
@@ -207,7 +207,7 @@ public class SimCardImportService {
     }
 
 
-    private Long createSystemUserForImport(String employeeId, Row row) {
+    private String createSystemUserForImport(String employeeId, Row row) {
         User systemUser = new User();
         systemUser.setEmployeeId(employeeId);
         systemUser.setUsername(employeeId);  // System-generated
@@ -231,7 +231,7 @@ public class SimCardImportService {
         User savedUser = userRepository.save(systemUser);
 //        log.info("👤 Created system user for employeeId: {} (ID: {})", employeeId, savedUser.getId());
 
-        return savedUser.getId();
+        return savedUser.getEmployeeId();
     }
 
 }

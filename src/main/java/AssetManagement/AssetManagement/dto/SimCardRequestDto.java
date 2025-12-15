@@ -20,7 +20,7 @@ public class SimCardRequestDto {
     private String imsi;
     private SimProvider provider;
     private SimStatus status;
-    private Long assignedUserId; // optional
+    private String assignedUserId; // optional
     private LocalDate activatedAt;
     private LocalDate purchaseDate;
     private String purchaseFrom;
