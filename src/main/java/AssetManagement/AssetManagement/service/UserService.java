@@ -2,8 +2,11 @@ package AssetManagement.AssetManagement.service;
 
 import AssetManagement.AssetManagement.dto.PaginatedResponse;
 import AssetManagement.AssetManagement.dto.UserDTO;
+import AssetManagement.AssetManagement.dto.UserResponseDto;
 import AssetManagement.AssetManagement.entity.User;
+import AssetManagement.AssetManagement.enums.Department;
 import AssetManagement.AssetManagement.exception.UserNotFoundException;
+import AssetManagement.AssetManagement.mapper.UserMapper;
 import AssetManagement.AssetManagement.repository.UserRepository;
 import AssetManagement.AssetManagement.util.AuthUtils;
 import org.springframework.data.domain.Pageable;
@@ -15,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -121,6 +125,9 @@ public class UserService {
     // Update an existing user
     @Transactional
     public UserDTO updateUser(Long id, UserDTO userDto) {
+
+        String updater = AuthUtils.getAuthenticatedUserExactName();
+
         User existingUser = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + id));
 
@@ -137,6 +144,7 @@ public class UserService {
         existingUser.setNote(userDto.getNote());
         existingUser.setLocation(userDto.getLocation());
         existingUser.setSite(userDto.getSite());
+        existingUser.setUpdatedBy(updater);
 
         User savedUser = userRepository.save(existingUser);
         return convertUserToDto(savedUser);
@@ -218,4 +226,76 @@ public class UserService {
             // 4) save
             userRepository.save(user);
         }
+
+    public PaginatedResponse<UserResponseDto> filterUsers(
+            String employeeId,
+            String username,
+            String role,
+            Department department,
+            Long siteId,
+            Long locationId,
+            String search,
+            LocalDateTime createdAfter,
+            LocalDateTime createdBefore,
+            int page,
+            int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+
+        Page<User> data = userRepository.filterUsers(
+                employeeId,
+                username,
+                role,
+                department,
+                siteId,
+                locationId,
+                search,
+                createdAfter,
+                createdBefore,
+                pageable
+        );
+
+        List<UserResponseDto> content = data.getContent()
+                .stream()
+                .map(UserMapper::toDto)
+                .toList();
+
+        return new PaginatedResponse<>(
+                content,
+                data.getNumber(),
+                data.getSize(),
+                data.getTotalElements(),
+                data.getTotalPages(),
+                data.isLast()
+        );
+    }
+
+    public List<UserResponseDto> filterUsersForExport(
+            String employeeId,
+            String username,
+            String role,
+            Department department,
+            Long siteId,
+            Long locationId,
+            String search,
+            LocalDateTime createdAfter,
+            LocalDateTime createdBefore
+    ) {
+        List<User> data = userRepository.filterUsersForExport(
+                employeeId,
+                username,
+                role,
+                department,
+                siteId,
+                locationId,
+                search,
+                createdAfter,
+                createdBefore
+        );
+
+        return data.stream()
+                .map(UserMapper::toDto)
+                .toList();
+    }
+
 }

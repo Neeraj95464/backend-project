@@ -7,7 +7,12 @@ import AssetManagement.AssetManagement.service.SimAttachmentService;
 import AssetManagement.AssetManagement.service.SimCardImportService;
 import AssetManagement.AssetManagement.service.SimCardService;
 import AssetManagement.AssetManagement.service.impl.SimCardServiceImpl;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.core.io.Resource;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -16,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -110,6 +116,92 @@ public class SimCardController {
                     size
             );
         }
+
+    @GetMapping("/filter/export")
+    public void exportFilteredCugSimsToExcel(
+            @RequestParam(required = false) String phoneNumber,
+            @RequestParam(required = false) String provider,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String employeeId,
+            @RequestParam(required = false) Long departmentId,
+            @RequestParam(required = false) Long siteId,
+            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime createdAfter,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime createdBefore,
+            HttpServletResponse response
+    ) throws IOException {
+
+        List<SimCardResponseDto> sims = simCardServiceImpl.filterSimsForExport(
+                phoneNumber,
+                provider,
+                status,
+                employeeId,
+                departmentId,
+                siteId,
+                locationId,
+                search,
+                createdAfter,
+                createdBefore
+        );
+
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        String filename = "cug_sims_" + LocalDateTime.now() + ".xlsx";
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("CUG Sims");
+
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("Phone Number");
+            header.createCell(1).setCellValue("Provider");
+            header.createCell(2).setCellValue("Status");
+            header.createCell(3).setCellValue("Assignee Name");
+            header.createCell(4).setCellValue("Assignee Designation");
+            header.createCell(5).setCellValue("Site");
+            header.createCell(6).setCellValue("Location");
+            header.createCell(7).setCellValue("Created At");
+
+            int rowIdx = 1;
+            for (SimCardResponseDto sim : sims) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(sim.getPhoneNumber());
+                // for enums, use name (string) instead of ordinal so Excel is readable
+                row.createCell(1).setCellValue(
+                        sim.getProvider() != null ? sim.getProvider().name() : ""
+                );
+                row.createCell(2).setCellValue(
+                        sim.getStatus() != null ? sim.getStatus().name() : ""
+                );
+                row.createCell(3).setCellValue(
+                        sim.getAssignedUserName() != null ? sim.getAssignedUserName() : ""
+                );
+                row.createCell(4).setCellValue(
+                        sim.getAssigneeDesignation() != null ? sim.getAssigneeDesignation() : ""
+                );
+                row.createCell(5).setCellValue(
+                        sim.getSiteName() != null ? sim.getSiteName() : ""
+                );
+                row.createCell(6).setCellValue(
+                        sim.getLocationName() != null ? sim.getLocationName() : ""
+                );
+                row.createCell(7).setCellValue(
+                        sim.getCreatedAt() != null ? sim.getCreatedAt().toString() : ""
+                );
+            }
+
+            for (int i = 0; i <= 7; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            workbook.write(response.getOutputStream());
+        }
+    }
+
 
     @PostMapping("attachments/{simId}")
     public ResponseEntity<?> uploadSimAttachment(

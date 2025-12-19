@@ -49,6 +49,8 @@ public class User {
 
     private String createdBy;
 
+    private String updatedBy;
+
     @ManyToOne
     @JoinColumn(name = "location_id")
     private Location location;

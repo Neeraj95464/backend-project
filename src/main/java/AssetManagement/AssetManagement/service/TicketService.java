@@ -2048,18 +2048,57 @@ public class TicketService {
                 header.createCell(5).setCellValue("Assignee");
                 header.createCell(6).setCellValue("Location");
                 header.createCell(7).setCellValue("Created At");
+                header.createCell(8).setCellValue("Closed At");
 
                 int rowIdx = 1;
+//                for (TicketDTO ticket : tickets) {
+//                    Row row = sheet.createRow(rowIdx++);
+//                    row.createCell(0).setCellValue(ticket.getId());
+//                    row.createCell(1).setCellValue(ticket.getTitle());
+//                    row.createCell(2).setCellValue(ticket.getStatus() != null ? ticket.getStatus().name() : "");
+//                    row.createCell(3).setCellValue(ticket.getCategory() != null ? ticket.getCategory().name() : "");
+//                    row.createCell(4).setCellValue(ticket.getEmployee().getUsername() != null ? ticket.getEmployee().getUsername() : "");
+//                    row.createCell(5).setCellValue(ticket.getAssignee().getUsername() != null ? ticket.getAssignee().getUsername() : "");
+//                    row.createCell(6).setCellValue(ticket.getLocationName() != null ? ticket.getLocationName() : "");
+//                    row.createCell(7).setCellValue(ticket.getCreatedAt() != null ? ticket.getCreatedAt().toString() : "");
+//                }
+
                 for (TicketDTO ticket : tickets) {
                     Row row = sheet.createRow(rowIdx++);
+
                     row.createCell(0).setCellValue(ticket.getId());
                     row.createCell(1).setCellValue(ticket.getTitle());
                     row.createCell(2).setCellValue(ticket.getStatus() != null ? ticket.getStatus().name() : "");
                     row.createCell(3).setCellValue(ticket.getCategory() != null ? ticket.getCategory().name() : "");
-                    row.createCell(4).setCellValue(ticket.getEmployee().getUsername() != null ? ticket.getEmployee().getUsername() : "");
-                    row.createCell(5).setCellValue(ticket.getAssignee().getUsername() != null ? ticket.getAssignee().getUsername() : "");
-                    row.createCell(6).setCellValue(ticket.getLocationName() != null ? ticket.getLocationName() : "");
-                    row.createCell(7).setCellValue(ticket.getCreatedAt() != null ? ticket.getCreatedAt().toString() : "");
+
+                    // Employee (nullable)
+                    String employeeName = "";
+                    if (ticket.getEmployee() != null && ticket.getEmployee().getUsername() != null) {
+                        employeeName = ticket.getEmployee().getUsername();
+                    }
+                    row.createCell(4).setCellValue(employeeName);
+
+                    // Assignee (nullable)
+                    String assigneeName = "";
+                    if (ticket.getAssignee() != null && ticket.getAssignee().getUsername() != null) {
+                        assigneeName = ticket.getAssignee().getUsername();
+                    }
+                    row.createCell(5).setCellValue(assigneeName);
+
+                    // Location
+                    row.createCell(6).setCellValue(
+                            ticket.getLocationName() != null ? ticket.getLocationName() : ""
+                    );
+
+                    // Created At
+                    row.createCell(7).setCellValue(
+                            ticket.getCreatedAt() != null ? ticket.getCreatedAt().toString() : ""
+                    );
+
+                    // Closed At
+                    row.createCell(8).setCellValue(
+                            ticket.getClosedAt() != null ? ticket.getClosedAt().toString() : ""
+                    );
                 }
 
                 ByteArrayOutputStream out = new ByteArrayOutputStream();

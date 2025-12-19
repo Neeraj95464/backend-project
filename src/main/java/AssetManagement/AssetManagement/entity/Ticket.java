@@ -39,7 +39,7 @@ public class Ticket {
         private String internetMessageId;
 
         @ManyToOne
-        @JoinColumn(name = "employee")
+        @JoinColumn(name = "employee", nullable = false)
         private User employee; // User who created the ticket
 
         private String createdBy;
