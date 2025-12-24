@@ -92,7 +92,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
                         cb.like(cb.lower(root.get("employeeId")), like),
                         cb.like(cb.lower(root.get("email")), like),
                         cb.like(cb.lower(root.get("phoneNumber")), like),
-                        cb.like(cb.lower(root.get("designation")), like)
+                        cb.like(cb.lower(root.get("designation")), like),
+                        cb.like(cb.lower(root.get("note")), like)
                 ));
             }
 

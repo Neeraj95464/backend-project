@@ -45,6 +45,14 @@ public class LocationController {
         }
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<Location> updateLocation(@PathVariable Long id,
+                                                   @RequestBody Location updated) {
+        Location saved = locationService.updateLocation(id, updated);
+        return ResponseEntity.ok(saved);
+    }
+
+
     @GetMapping
     public List<Location> getAllLocations() {
         return locationService.getAllLocations();

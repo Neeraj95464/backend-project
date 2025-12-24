@@ -353,9 +353,9 @@ public ResponseEntity<PaginatedResponse<AssetDTO>> getAllAssets(
     }
 
     @GetMapping("/user/{empId}")
-    public ResponseEntity<List<AssetDTO>> getAssetsByUser(@PathVariable String empId) {
+    public ResponseEntity<List<MyAssetDTO>> getAssetsByUser(@PathVariable String empId) {
         try {
-            List<AssetDTO> assets = assetService.getAssetsByUser(empId);
+            List<MyAssetDTO> assets = assetService.getAssetsByUser(empId);
             return ResponseEntity.ok(assets);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();

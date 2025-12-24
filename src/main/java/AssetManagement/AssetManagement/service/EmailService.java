@@ -38,10 +38,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.*;
 import java.util.List;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -220,20 +218,87 @@ public class EmailService {
     }
 
 
+//    @Transactional
+//    public TicketDTO createTicketFromEmail(String emailSubject, String emailBody, String senderEmail) {
+//        Ticket ticket = new Ticket();
+//        ticket.setTitle(emailSubject);
+//        ticket.setDescription(emailBody);
+//        ticket.setCategory(TicketCategory.OTHER);
+////        ticket.setTicketDepartment(null);
+//        ticket.setTicketDepartment(TicketDepartment.IT);
+////        ticket.setStatus(TicketStatus.OPEN);
+//
+//        System.out.println("Sender email: " + senderEmail);
+//
+////        User sender = userRepository.findByEmail(senderEmail)
+////                .orElseThrow(() -> new UserNotFoundException("User not found"));
+//
+//        List<User> matchedUsers = userRepository.findAllByEmail(senderEmail);
+//
+//        User sender;
+//
+//        if (matchedUsers.size() == 1) {
+//            // ✅ Exactly one user found
+//            sender = matchedUsers.getFirst();
+//        } else if (matchedUsers.isEmpty()) {
+//            // ❌ No user found, check company domain
+//            boolean domainMatched = COMPANY_DOMAINS.stream().anyMatch(senderEmail::endsWith);
+//
+//            if (domainMatched) {
+//                // ✅ Domain matched, create fallback user
+//                sender = new User();
+//                sender.setUsername("Unknown User");
+//                sender.setEmail(senderEmail);
+//                sender.setNote("User not found in DB but domain matched");
+//
+//                String nextTempEmpId = generateNextTempEmployeeId();
+//                sender.setEmployeeId(nextTempEmpId);
+//            } else {
+//                // ❌ Not allowed to raise ticket if domain doesn't match
+//                throw new RuntimeException("Unauthorized sender: Email domain not allowed.");
+//            }
+//
+//        } else {
+//            // ❌ Multiple users found
+////            sender = new User();
+////            sender.setUsername("Multiple Users Found");
+////            sender.setEmail(senderEmail);
+////            sender.setNote("Multiple users found with the same email");
+//
+//            // Generate unique temp employeeId
+//            String nextTempEmpId = generateNextTempEmployeeId();
+//            sender.setEmployeeId(nextTempEmpId);
+//        }
+//
+//        userRepository.save(sender);
+//
+//        System.out.println("User found - Email: " + sender.getUsername());
+//
+//        ticket.setEmployee(sender);
+//
+//        if (ticket.getAssignee() == null) {
+//            ticket.setStatus(TicketStatus.UNASSIGNED);
+//        } else {
+//            ticket.setStatus(TicketStatus.OPEN);
+//        }
+//
+//        ticket.setCreatedAt(LocalDateTime.now());
+//        ticket.setUpdatedAt(LocalDateTime.now());
+//
+//        Ticket savedTicket = ticketRepository.save(ticket);
+//        return ticketMapper.toDTO(savedTicket);
+//    }
+
     @Transactional
     public TicketDTO createTicketFromEmail(String emailSubject, String emailBody, String senderEmail) {
+
         Ticket ticket = new Ticket();
         ticket.setTitle(emailSubject);
         ticket.setDescription(emailBody);
         ticket.setCategory(TicketCategory.OTHER);
-//        ticket.setTicketDepartment(null);
         ticket.setTicketDepartment(TicketDepartment.IT);
-//        ticket.setStatus(TicketStatus.OPEN);
 
-        System.out.println("Sender email: " + senderEmail);
-
-//        User sender = userRepository.findByEmail(senderEmail)
-//                .orElseThrow(() -> new UserNotFoundException("User not found"));
+//        System.out.println("Sender email: " + senderEmail);
 
         List<User> matchedUsers = userRepository.findAllByEmail(senderEmail);
 
@@ -241,13 +306,16 @@ public class EmailService {
 
         if (matchedUsers.size() == 1) {
             // ✅ Exactly one user found
-            sender = matchedUsers.getFirst();
+            sender = matchedUsers.get(0);
+
         } else if (matchedUsers.isEmpty()) {
             // ❌ No user found, check company domain
-            boolean domainMatched = COMPANY_DOMAINS.stream().anyMatch(senderEmail::endsWith);
+            boolean domainMatched = COMPANY_DOMAINS
+                    .stream()
+                    .anyMatch(senderEmail::endsWith);
 
             if (domainMatched) {
-                // ✅ Domain matched, create fallback user
+                // ✅ Domain matched → create fallback user
                 sender = new User();
                 sender.setUsername("Unknown User");
                 sender.setEmail(senderEmail);
@@ -255,26 +323,22 @@ public class EmailService {
 
                 String nextTempEmpId = generateNextTempEmployeeId();
                 sender.setEmployeeId(nextTempEmpId);
+
+                userRepository.save(sender);
             } else {
-                // ❌ Not allowed to raise ticket if domain doesn't match
+                // ❌ Domain not allowed
                 throw new RuntimeException("Unauthorized sender: Email domain not allowed.");
             }
 
         } else {
-            // ❌ Multiple users found
-            sender = new User();
-            sender.setUsername("Multiple Users Found");
-            sender.setEmail(senderEmail);
-            sender.setNote("Multiple users found with the same email");
-
-            // Generate unique temp employeeId
-            String nextTempEmpId = generateNextTempEmployeeId();
-            sender.setEmployeeId(nextTempEmpId);
+            // ✅ Multiple users found → pick the latest one
+            sender = matchedUsers.stream()
+                    .max(Comparator.comparing(User::getId))
+                    .orElseThrow(() ->
+                            new RuntimeException("Unable to resolve user from multiple matches"));
         }
 
-        userRepository.save(sender);
-
-        System.out.println("User found - Email: " + sender.getUsername());
+        System.out.println("User resolved - Username: " + sender.getUsername());
 
         ticket.setEmployee(sender);
 
@@ -290,6 +354,7 @@ public class EmailService {
         Ticket savedTicket = ticketRepository.save(ticket);
         return ticketMapper.toDTO(savedTicket);
     }
+
 
     private String generateNextTempEmployeeId() {
         List<String> tempEmpIds = userRepository.findAllEmployeeIdsStartingWith("temp");

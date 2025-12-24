@@ -42,6 +42,26 @@ public class SiteService {
     }
 
 
+//    public SiteDTO toSiteDTO(Site site) {
+//        SiteDTO dto = new SiteDTO();
+//        dto.setId(site.getId());
+//        dto.setName(site.getName());
+//        dto.setRegion(site.getRegion());
+//        dto.setCountry(site.getCountry());
+//
+//        List<LocationDTO> locations = site.getLocations().stream().map(loc -> {
+//            LocationDTO lDto = new LocationDTO();
+//            lDto.setSiteId(loc.getId());
+//            lDto.setId(loc.getId());
+//            lDto.setName(loc.getName());
+//            lDto.setAddress(loc.getAddress());
+//            return lDto;
+//        }).collect(Collectors.toList());
+//
+//        dto.setLocations(locations);
+//        return dto;
+//    }
+
     public SiteDTO toSiteDTO(Site site) {
         SiteDTO dto = new SiteDTO();
         dto.setId(site.getId());
@@ -51,15 +71,19 @@ public class SiteService {
 
         List<LocationDTO> locations = site.getLocations().stream().map(loc -> {
             LocationDTO lDto = new LocationDTO();
-            lDto.setSiteId(loc.getId());
+            lDto.setId(loc.getId());           // ✅ Location's own ID
+            lDto.setSiteId(site.getId());      // ✅ Parent Site's ID
             lDto.setName(loc.getName());
             lDto.setAddress(loc.getAddress());
+            lDto.setPostalCode(loc.getPostalCode());  // ✅ Add these too
+            lDto.setState(loc.getState());
             return lDto;
         }).collect(Collectors.toList());
 
         dto.setLocations(locations);
         return dto;
     }
+
 
 
     public LocationDTO addLocation(LocationDTO dto) {

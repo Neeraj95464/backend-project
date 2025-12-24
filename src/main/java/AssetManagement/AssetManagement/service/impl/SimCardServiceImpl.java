@@ -411,36 +411,6 @@ public class SimCardServiceImpl implements SimCardService {
         );
     }
 
-//    public List<SimCardResponseDto> filterSimsForExport(
-//            String phoneNumber,
-//            String provider,
-//            String status,
-//            String employeeId,
-//            Long departmentId,
-//            Long siteId,
-//            Long locationId,
-//            String search,
-//            LocalDateTime createdAfter,
-//            LocalDateTime createdBefore
-//    ) {
-//        List<SimCard> data = simCardRepository.filterSimsForExport(
-//                phoneNumber,
-//                provider,
-//                status,
-//                employeeId,
-//                departmentId,
-//                siteId,
-//                locationId,
-//                search,
-//                createdAfter,
-//                createdBefore
-//        );
-//
-//        return data.stream()
-//                .map(CugSimMapper::toDTO)
-//                .toList();
-//    }
-
     public List<SimCardResponseDto> filterSimsForExport(
             String phoneNumber,
             String provider,

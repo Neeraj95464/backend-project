@@ -35,5 +35,18 @@ public class LocationService {
         return locationRepository.save(location);
     }
 
+    public Location updateLocation(Long id, Location updated) {
+        Location existing = locationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Location not found"));
+
+        existing.setName(updated.getName());
+        existing.setAddress(updated.getAddress());
+        existing.setPostalCode(updated.getPostalCode());
+        existing.setState(updated.getState());
+
+        return locationRepository.save(existing);
+    }
+
+
 }
 

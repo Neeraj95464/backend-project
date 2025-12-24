@@ -15,6 +15,7 @@ import AssetManagement.AssetManagement.repository.AssetRepository;
 import AssetManagement.AssetManagement.repository.LocationRepository;
 import AssetManagement.AssetManagement.repository.SiteRepository;
 import AssetManagement.AssetManagement.repository.UserRepository;
+import AssetManagement.AssetManagement.util.AuthUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -295,6 +296,9 @@ public class EmployeeOnboardingService {
             if (site != null) u.setSite(site);
             if (location != null) u.setLocation(location);
 
+            String modifiedBy = AuthUtils.getAuthenticatedUserExactName();
+            u.setCreatedBy(modifiedBy);
+
 //            u.setIsDeleted(false);
             User saved = userRepository.save(u);
             log.info("Updated user for employeeId {}", employeeId);
@@ -314,6 +318,8 @@ public class EmployeeOnboardingService {
             newUser.setLocation(location);
             newUser.setDesignation(row.get("designation"));
 //            newUser.setIsDeleted(false);
+            String createdBy = AuthUtils.getAuthenticatedUserExactName();
+            newUser.setCreatedBy(createdBy);
 
             User saved = userRepository.save(newUser);
             log.info("Created new user for employeeId {}", employeeId);
